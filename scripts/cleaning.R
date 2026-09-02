@@ -21,4 +21,12 @@ all(d.raw$matches_total == d.raw$wins + d.raw$losses + d.raw$draws)
 
 # Extract midyear snapshot date
 d.wc <- d.raw[d.raw$year == 2026 & d.raw$snapshot_date == "2026-07-07", ]
-d.full <- d.raw[!(d.raw$year == 2026 & d.raw$snapshot_da
+d.full <- d.raw[!(d.raw$year == 2026 & d.raw$snapshot_date == "2026-07-07"), ]
+
+# Check the duplicate values again
+sum(duplicated(d.full[c("year", "country")])) 
+
+# Save into new datasets
+write.csv(d.wc, "data/wc_elo_ratings.csv", row.names = FALSE)
+write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
+
