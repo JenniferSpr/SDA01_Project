@@ -21,12 +21,23 @@ library(here)
 # Load data
 d.raw <- read.csv(here("data", "elo_ratings_wc2026.csv"))
 
+# Check the dimensions
+dim(d.raw)
+
+# Convert snapshot_date to Date format
+d.raw$snapshot_date <- as.Date(d.raw$snapshot_date)
+class(d.raw$snapshot_date)
+
 # Missing values 
 colSums(is.na(d.raw))
 
 # Duplicate values
 sum(duplicated(d.raw))
 sum(duplicated(d.raw[c("year", "country")]))
+
+# Display duplicated country-year observations
+d.raw[duplicated(d.raw[c("year", "country")]) | duplicated(d.raw[c("year", "country")], fromLast = TRUE),
+  c("year", "country", "snapshot_date")]
 
 # Date range
 range(d.raw$year)                      
@@ -37,8 +48,10 @@ all(d.raw$matches_total == d.raw$matches_home + d.raw$matches_away + d.raw$match
 all(d.raw$matches_total == d.raw$wins + d.raw$losses + d.raw$draws)
 
 # Extract midyear snapshot date
-d.wc <- d.raw[d.raw$year == 2026 & d.raw$snapshot_date == "2026-07-07", ]
-d.full <- d.raw[!(d.raw$year == 2026 & d.raw$snapshot_date == "2026-07-07"), ]
+d.wc <- d.raw[d.raw$year == 2026 & d.raw$snapshot_date == as.Date("2026-07-07"),]
+
+# Remove the July 2026 snapshot from the main dataset
+d.full <- d.raw[!(d.raw$year == 2026 & d.raw$snapshot_date == as.Date("2026-07-07")),]
 
 # Check the duplicate values again
 sum(duplicated(d.full[c("year", "country")])) 
