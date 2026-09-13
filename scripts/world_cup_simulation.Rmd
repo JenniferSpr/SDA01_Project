@@ -1,0 +1,1518 @@
+---
+title: "world_cup_simulation"
+output: 
+  html_document
+runtime: shiny
+---
+
+The World Cup is a tournament in which small differences in team strength and individual match outcomes can have a large impact on the final result. Although it is impossible to predict the winner of every match with certainty, simulations can be done to estimate the likelihood of different tournament outcomes.
+
+We simulate the 2026 World Cup using the official group structure and Elo ratings to represent team strength. By repeating the tournament many times through Monte Carlo simulation, we estimate each team's probability of reaching the round of 32, round of 16, quarter-finals, semi-finals and final, as well as winning the title. The aim is not to predict one exact tournament outcome, but to explore a range of plausible outcomes and identify the teams most likely to succeed.
+
+```{r libraries_wc, include=FALSE}
+# load libraries
+library(here)
+library(gt)
+library(dplyr)
+library(ggplot2)
+library(shiny)
+library(plotly)
+library(tidyr)
+
+# load data
+data <- read.csv(here("data","wc_elo_ratings.csv"))
+```
+
+## Group Composition
+
+We decided to use the same groups as in the 2026 World Cup : the 48 teams are divided into 12 groups, labelled A to L, with four teams in each group. Using the fixed, official groups gives a consistent basis for comparing our simulated outcomes with the tournament's real results.
+
+```{r group_wc}
+# teams 
+teams <- c(
+  A1 = "Mexico",         A2 = "South Africa",   A3 = "South Korea",  A4 = "Czechia",
+  B1 = "Canada",         B2 = "Bosnia and Herzegovina", B3 = "Qatar", B4 = "Switzerland",
+  C1 = "Brazil",         C2 = "Morocco",        C3 = "Haiti",        C4 = "Scotland",
+  D1 = "United States",  D2 = "Paraguay",       D3 = "Australia",    D4 = "Turkey",
+  E1 = "Germany",        E2 = "Curaçao",        E3 = "Ivory Coast",  E4 = "Ecuador",
+  F1 = "Netherlands",    F2 = "Japan",          F3 = "Sweden",       F4 = "Tunisia",
+  G1 = "Belgium",        G2 = "Egypt",          G3 = "Iran",         G4 = "New Zealand",
+  H1 = "Spain",          H2 = "Cape Verde",     H3 = "Saudi Arabia", H4 = "Uruguay",
+  I1 = "France",         I2 = "Senegal",        I3 = "Iraq",         I4 = "Norway",
+  J1 = "Argentina",      J2 = "Algeria",        J3 = "Austria",      J4 = "Jordan",
+  K1 = "Portugal",       K2 = "DR Congo",       K3 = "Uzbekistan",   K4 = "Colombia",
+  L1 = "England",        L2 = "Croatia",        L3 = "Ghana",        L4 = "Panama"
+)
+
+# add team's group ID
+data$id <- names(teams)[match(data$country,teams)]
+
+# extract group letter 
+data$letter <- substr(data$id,1,1)
+
+# name of the groups
+group_letters <- LETTERS[1:12]
+
+# store ratings
+rating <- setNames(data$rating, data$country)
+```
+
+Each team is assigned an ID consisting of its group letter and a number from 1 to 4. The number represents its position in the group, not its final ranking. The 12 groups are the following :
+
+```{r group_table}
+# create the text for each group
+group_text <- sapply(group_letters, function(letter) {
+  group_teams <- teams[paste0(letter, 1:4)]
+  
+  paste0(
+    "**Group ", letter, "**  \n",
+    paste(group_teams, collapse = "  \n")
+  )
+})
+
+# arrange the groups into 4x3 matrix
+group_table_data <- as.data.frame(
+  matrix(group_text, ncol = 4, byrow = TRUE)
+)
+
+# display the table
+groups_table <- group_table_data %>%
+  gt() %>%
+  fmt_markdown(columns = everything()) %>%
+  tab_header(title = "FIFA World Cup 2026 - Groups") %>%
+  cols_align(align = "left") %>%
+  tab_options(
+    column_labels.hidden = TRUE,
+    table.width = pct(100)
+  )
+
+# show table
+groups_table
+```
+
+## Match Model
+
+In the group stage, each team has to plays the three other teams in its group. The possible outcomes of a match are a win, a draw or a loss, and teams are ranked according to the points they earn.
+
+To model match outcomes, we first calculate the difference between the two team's Elo ratings :
+
+$$d = R_A - R_B$$
+
+This rating difference expresses how much stronger (or weaker) team A is than team B. This difference is then used in the Elo formula : $$W_e = \frac{1}{1 + 10^{-d/400}}$$
+
+In the standard Elo interpretation, this quantity represents an expected score, where a win counts as 1, a draw as 0.5 and a loss as 0. However, it does not separately specify the probabilities of these three outcomes. We therefore introduce a model for the probability of a draw.
+
+We assume that draws are most likely to occur between teams of similar strength and become less likely as the rating gap increases. We represent this behaviour using a Gaussian function :
+
+$$P(Draw) = D_{max}e^{-d^2/2\sigma^2}$$
+
+Here, $D_{max}$ is the maximum draw probability, reached when the two teams have identical ratings ($d=0$). The parameter $\sigma$ controls how quickly this probability decreases as the rating gap grows in either direction.
+
+Recent World Cups provide a reference for the frequency of draws. Across all matches played, the proportion of draws ranged from approximately 20% to 25% between 2010 and 2022 (*2010: 25%, 2014: 20%, 2018: 20% and 2022: 23%).* We therefore decided to use a maximum draw rate of 30%, slightly above these rates.
+
+We set $\sigma = 200$, choosing half of the 400-point scale used in the Elo formula as a simple reference.
+
+Once the draw probability has been determined, we distribute the remaining probability between the two teams using the Elo value :
+
+$$P(A\;wins) = (1-P(draw))W_e \;\;\;\;\;\;\;\;\;\;\;\;\;\;\;P(B\;wins) = (1-P(Draw))(1-W_e)$$
+
+By construction, the three probabilities always sum to 1. We then randomly select a win, draw or loss according to these probabilities to simulate the match outcome.
+
+```{r match_function}
+# settings
+Dmax <- 0.30
+sigma <- 200
+
+# simulate one match
+play_match <- function(team_a, team_b){
+  
+  # difference in ratings
+  d <- rating[team_a]-rating[team_b]
+  
+  # probability of a draw
+  p_draw <- Dmax * exp (-(d^2)/(2*sigma^2))
+  
+  # win expectancy team a 
+  we_a <- 1 / (1+10^(-d/400))
+  
+  # win probabilities
+  p_a_win <- (1-p_draw)*we_a
+  p_b_win <- (1-p_draw)*(1-we_a)
+  
+  # simulate
+  sample(
+    c("team_a","draw","team_b"),
+    size = 1,
+    prob = c(p_a_win, p_draw, p_b_win)
+  )
+}
+```
+
+## Group Stage
+
+As mentioned, within each group, every team plays the other three. At the end of the group stage, 32 teams qualify for the knockout phase: the top two teams from each group and the eight best third-placed teams across all groups.
+
+The teams are ranked by points, with three points awarded for a win, one for a draw and none for a loss. In the actual tournament, ties on points are resolved using addition criteria, such as counting goals or the number of yellow and red cards obtained. Since we simulate match outcomes without generating scores or cards, we break ties on points randomly.
+
+```{r group_function}
+# simulate all matches in one group
+play_group <- function(group_teams) {
+  
+  # set points at zero 
+  points <- setNames(rep(0,4), group_teams)
+  
+  # each team plays the other three
+  for (i in 1:3) {
+    for (j in (i+1):4) {
+      team_a <- group_teams[i]
+      team_b <- group_teams[j]
+      
+      # store result of one match
+      result <- play_match(team_a, team_b)
+      
+      # points
+      if (result == "team_a") {
+        points[team_a] <- points[team_a] + 3
+      }
+      
+      if (result == "team_b") {
+        points[team_b] <- points[team_b] + 3
+      }
+      
+      if (result == "draw") {
+        points[team_a] <- points[team_a] + 1
+        points[team_b] <- points[team_b] + 1
+      }
+    }
+  }
+  
+  # rank teams by points and break at random if needed
+  ranking <- order(-points, runif(4))
+  
+  # save ranking
+  list(
+    teams = group_teams[ranking],
+    points = points[ranking]
+  )
+}
+```
+
+After simulating the entire group stage, we obtain the 32 qualified teams. Each receives a new ID combining its group-stage ranking and group letter : 1 for group winners, 2 for runners-up and 3 for qualifying third-placed teams.
+
+```{r group_stage}
+# simulate the whole group stage
+qualify_r32 <- function() {
+  
+  # initialize the qualifiers
+  winners <- character(12)
+  runners_up <- character(12)
+  third_teams <- character(12)
+  third_points <- numeric(12)
+  
+  # play every group
+  for (i in 1:12) {
+    group_letter <- group_letters[i]
+    group_teams <- teams[paste0(group_letter,1:4)]
+    
+    # save result
+    group_result <- play_group(group_teams)
+    winners[i] <- group_result$teams[1]
+    runners_up[i] <- group_result$teams[2]
+    third_teams[i] <- group_result$teams[3]
+    third_points[i] <- group_result$points[3]
+  }
+    
+    # pick the 8 best-third teams
+    best_thirds <- order(-third_points, runif(12))[1:8]
+    
+    # assign new ids 
+    data.frame(
+      new_id = c(paste0("1", group_letters),
+                 paste0("2", group_letters),
+                 paste0("3", group_letters[best_thirds])),
+      team = c(winners, runners_up, third_teams[best_thirds]),
+      place = c(rep("winner",12), rep("runner_up",12), rep("best_third",8)), stringsAsFactors=FALSE
+    )
+}
+```
+
+## Knockout Stage
+
+Once a team qualifies, it enters the knockout phase, where each match must produce a winner. The winner advances to the next round, while the loser is eliminated. We use the Elo formula directly to model each team's probability of winning the match.
+
+```{r knockout_function}
+# simulate one match
+knockout_match <- function(team_a, team_b) {
+  
+  # rating difference
+  d <- rating[team_a] - rating[team_b]
+  
+  # probability that team a wins
+  p_a_win <- 1 / (1+10^(-d/400))
+  
+  # play match
+  if (runif(1) < p_a_win) {
+    winner <- team_a
+    loser <- team_b
+  } else {
+    winner <- team_b
+    loser <- team_a
+  }
+  
+  # save result
+  list(
+    winner = winner,
+    loser = loser
+  )
+}
+```
+
+The knockout matches follow a predefined schedule. We decided to use the official schedule to maintain consistency with the group composition. Indeed, each team's position in its group determines its possible route through the knockout stage, including which opponents it could face and at which stage.
+
+```{r calendar}
+# load calendar
+calendar_ko <- read.csv(here("data","calendar_ko.csv"), stringsAsFactors = FALSE, colClasses="character" )
+
+calendar_ko
+```
+
+We transcribed the official schedule into a CSV file containing each match's identifier, round and references to team A and team B.
+
+Placing the group winners and runners-up is straightforward, but the eigth best third-placed teams are not : their opponents depend on which groups they qualify from, and there are 495 possible combinations. Each third-place slot can only be filled by teams from a specific set of groups, so we use the official allocation table to determine the exact assignment for each combination.
+
+```{r third}
+# load third table assignment
+third_table <- read.csv(here("data","third_place_assignments_495.csv"), colClasses= "character", stringsAsFactors=FALSE)
+
+head(third_table, 5)
+```
+
+Each row in the table represents a possible combination of groups from which the 8 best-thirds teams come. For example, the first row applies when these teams come from groups E, F, G, H, I, J, K and L.
+
+```{r thirds_slots}
+# assign slots for best thirds
+assign_r32_slots <- function(qualifiers) {
+  
+  # identify qualifying third-placed teams
+  is_third <- qualifiers$place == "best_third"
+  third_ids <- qualifiers$new_id[is_third]
+  
+  # create combination key 
+  combination <- paste(
+    sort(sub("^3", "", third_ids)),
+    collapse = ""
+  )
+  
+  # find corresponding row in table 
+  assignment <- third_table[
+    which(third_table$combination==combination),
+  ]
+  
+  # calendar slots and corresponding columns in table
+  slots <- c("3ABCDF", "3CDFGH", "3CEFHI", "3EHIJK",
+             "3BEFIJ", "3AEHIJ", "3EFGIJ", "3DEIJL"
+  )
+  
+  columns <- c(
+    "vs_1E", "vs_1I", "vs_1A", "vs_1L",
+    "vs_1D", "vs_1G", "vs_1B", "vs_1K"
+  )
+  
+  # read third-placed team in each slot
+  assigned_ids <- as.character(
+    unlist(assignment[columns], use.names = FALSE)
+  )
+  
+  # keep existing IDs for winners and runners-up
+  qualifiers$slot_id <- qualifiers$new_id
+  
+  # assign calendar slots to third placed teams
+  qualifiers$slot_id[is_third] <- slots[match(third_ids, assigned_ids)]
+  
+  qualifiers
+}
+```
+
+Once the teams have been assigned their slot IDs for the first knockout round, we simulate the matches in calendar order. The winner of each match advances to the next round and the results are stored to determine the participants in the next matches.
+
+```{r play_knockout}
+# play knockout
+play_knockout <- function(qualifiers, calendar = calendar_ko) {
+  
+  # assign calendar slots to qualified teams
+  qualifiers <- assign_r32_slots(qualifiers)
+  
+  team_by_slot <- setNames(
+    qualifiers$team,
+    qualifiers$slot_id
+  )
+  
+  # store winners and losers by match ID
+  winners <- losers <- setNames(
+    rep(NA_character_, nrow(calendar)),
+    calendar$match_no
+  )
+  
+  results <- vector("list", nrow(calendar))
+  
+  # play matches in calendar order
+  for (i in seq_len(nrow(calendar))) {
+    
+    match_id <- calendar$match_no[i]
+    stage <- calendar$round[i]
+    
+    reference_a <- calendar$team_a[i]
+    reference_b <- calendar$team_b[i]
+    
+    if (stage == "R32") {
+      
+      # use the group-stage qualifiers
+      team_a <- team_by_slot[reference_a]
+      team_b <- team_by_slot[reference_b]
+      
+    } else if (stage == "Third") {
+      
+      # Use the losing semi-finalists
+      team_a <- losers[sub("^Runner-up ", "", reference_a)]
+      team_b <- losers[sub("^Runner-up ", "", reference_b)]
+      
+    } else {
+      
+      # use the winners of previous matches
+      team_a <- winners[reference_a]
+      team_b <- winners[reference_b]
+    }
+    
+    team_a <- unname(team_a)
+    team_b <- unname(team_b)
+    
+    # simulate the match
+    result <- knockout_match(team_a, team_b)
+    
+    winners[match_id] <- result$winner
+    losers[match_id] <- result$loser
+    
+    # save the result
+    results[[i]] <- data.frame(
+      match_no = match_id,
+      round = stage,
+      team_a = team_a,
+      team_b = team_b,
+      winner = unname(result$winner),
+      loser = unname(result$loser),
+      stringsAsFactors = FALSE
+    )
+  }
+  
+  do.call(rbind, results)
+}
+```
+
+## Simulation
+
+Finally, we run the Monte Carlo simulation, repeating the tournament many times to estimate each team's probability of reaching each stage and winning the title. For each simulation, we record which teams reach each stage and which teams wins the tournament. After all simulations, we estimate each probability by dividing the number of times a team reaches that stage by the total number of simulations.
+
+```{r monte_carlo_function}
+# fix the seed
+set.seed(NULL)  
+
+# monte carlo function
+run_cup_mc <- function(number_of_simulations) {
+  
+  # stages we want probabilities
+  stages <- c("R32", "R16", "QF", "SF", "Final", "Champion")
+  
+  # track each team's progress
+  results <- matrix(
+    0,
+    nrow = length(teams),
+    ncol = length(stages),
+    dimnames = list(unname(teams), stages)
+  )
+  
+  # repeat complete tournament
+  for (i in seq_len(number_of_simulations)) {
+    
+    # simulate group stage
+    qualified_teams <- qualify_r32()
+    
+    # simulate knockout stage
+    knockout_results <- play_knockout(
+      qualifiers = qualified_teams,
+      calendar = calendar_ko
+    )
+    
+    # collect teams that reached each stage in this tournament
+    reached <- list(
+      R32 = qualified_teams$team,
+      
+      R16 = knockout_results$winner[
+        knockout_results$round == "R32"
+      ],
+      
+      QF = knockout_results$winner[
+        knockout_results$round == "R16"
+      ],
+      
+      SF = knockout_results$winner[
+        knockout_results$round == "Quarter"
+      ],
+      
+      Final = knockout_results$winner[
+        knockout_results$round == "Semi"
+      ],
+      
+      Champion = knockout_results$winner[
+        knockout_results$round == "Final"
+      ]
+    )
+    
+    
+    # update counters for each stage
+    for (stage in stages) {
+      participants <- reached[[stage]]
+      results[participants, stage] <-
+        results[participants, stage] + 1
+    }
+  }
+  
+  # convert counts in percentages
+  percentages <- 100 * results / number_of_simulations
+  
+  # results table 
+  output <- data.frame(
+    team = rownames(percentages),
+    elo = unname(rating[rownames(percentages)]),
+    percentages,
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )
+  
+  # sort before rounding
+  output <- output[
+    order(-output$Champion, -output$Final),
+  ]
+  
+  # apply rounding
+  output[stages] <- lapply(output[stages], round, digits = 1)
+  rownames(output) <- NULL
+  
+  output
+}
+```
+
+# Interactive App
+
+The following interactive application allows users to choose the number of simulations and a random seed. Using the same seed and settings reproduces the predictions, while changing the seed generates a different simulation run.
+
+The first tab, "Tournament predictions", displays the favourites' estimated title probabilities. The second tab, "Explore a team", lets users to select a team and view its probability of reaching each stage. Finally, "Simulate one tournament" generates a single possible tournament, showing the qualified teams, knockout matches and champion.
+
+```{r simulator-ui, echo=FALSE}
+## generated by AI
+tagList(
+  
+  tags$style(HTML("
+    .wc-app {
+      width: 100%;
+      height: 850px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 15px;
+      border: 1px solid #dfe5eb;
+      border-radius: 12px;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    .wc-groups {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin: 16px 0 24px;
+    }
+
+    .wc-card {
+      border: 1px solid #dfe5eb;
+      border-radius: 10px;
+      background: white;
+      overflow: hidden;
+    }
+
+    .wc-card-title {
+      background: #f1f5f9;
+      padding: 10px 12px;
+      font-weight: 600;
+      color: #243b53;
+    }
+
+    .wc-team {
+      padding: 9px 12px;
+      border-top: 1px solid #edf0f3;
+      overflow-wrap: anywhere;
+    }
+
+    .wc-position {
+      display: inline-block;
+      min-width: 28px;
+      color: #718096;
+      font-size: 12px;
+    }
+
+    .wc-winner {
+      background: #e8f5ee;
+      color: #176342;
+      font-weight: 600;
+    }
+
+    .wc-champion {
+      padding: 20px;
+      margin: 18px 0;
+      background: #e8f5ee;
+      border-left: 5px solid #24845b;
+      border-radius: 8px;
+    }
+
+    .wc-champion-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #476459;
+    }
+
+    .wc-champion-name {
+      font-size: 28px;
+      font-weight: 700;
+      color: #176342;
+    }
+
+    .wc-bracket {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      padding: 12px 0 20px;
+    }
+
+    .wc-round {
+      flex: 0 0 200px;
+    }
+
+    .wc-round-title {
+      font-weight: 600;
+      color: #243b53;
+      margin-bottom: 14px;
+    }
+
+    .wc-match {
+      margin-bottom: 12px;
+    }
+
+    .wc-third {
+      max-width: 320px;
+      margin-top: 20px;
+    }
+  ")),
+  
+  div(
+    class = "wc-app",
+    
+    sidebarLayout(
+      
+      sidebarPanel(
+        
+        numericInput(
+          "n_simulations",
+          "Number of simulations",
+          value = 1000,
+          min = 100,
+          max = 50000,
+          step = 100
+        ),
+        
+        numericInput(
+          "simulation_seed",
+          "Random seed",
+          value = 123,
+          min = 1,
+          max = 1000000,
+          step = 1
+        ),
+        
+        actionButton(
+          "run_mc",
+          "Run simulations",
+          class = "btn-primary"
+        ),
+        
+        helpText(
+          "The same seed and settings reproduce the same predictions."
+        ),
+        
+        width = 3
+      ),
+      
+      mainPanel(
+        
+        tabsetPanel(
+          
+          tabPanel(
+            "Tournament predictions",
+            
+            br(),
+            
+            textOutput("simulation_status"),
+            
+            plotlyOutput(
+              "favourites_chart",
+              height = "500px"
+            )
+          ),
+          
+          tabPanel(
+            "Explore a team",
+            
+            br(),
+            
+            selectInput(
+              "selected_team",
+              "Select a team",
+              choices = sort(unname(teams)),
+              selected = "Switzerland"
+            ),
+            
+            h3(textOutput("team_title")),
+            
+            textOutput("team_details"),
+            
+            plotlyOutput(
+              "team_chart",
+              height = "400px"
+            )
+          ),
+          
+          tabPanel(
+            "Simulate one tournament",
+            
+            br(),
+            
+            p("Generate one possible World Cup scenario."),
+            
+            actionButton(
+              "run_single",
+              "Simulate a tournament",
+              class = "btn-primary"
+            ),
+            
+            uiOutput("single_champion"),
+            
+            tabsetPanel(
+              
+              tabPanel(
+                "Qualified teams",
+                uiOutput("single_qualifiers")
+              ),
+              
+              tabPanel(
+                "Knockout bracket",
+                
+                p(
+                  "Winners are highlighted in green. Scroll horizontally to explore the rounds.",
+                  style = "margin-top: 15px; color: #667085;"
+                ),
+                
+                uiOutput("single_matches")
+              )
+            )
+          )
+        ),
+        
+        width = 9
+      )
+    )
+  )
+)
+```
+
+```{r simulator, echo=FALSE}
+## generated by AI
+run_mc_shiny <- function(n) {
+  
+  # Stages tracked for every team
+  stages <- c("R32", "R16", "QF", "SF", "Final", "Champion")
+  
+  # Start all counters at zero
+  counts <- matrix(
+    0,
+    nrow = length(teams),
+    ncol = length(stages),
+    dimnames = list(unname(teams), stages)
+  )
+  
+  # Update the progress bar approximately 100 times
+  update_every <- max(1L, floor(n / 100))
+  
+  shiny::withProgress(
+    message = "Simulating tournaments",
+    value = 0,
+    {
+      
+      for (i in seq_len(n)) {
+        
+        # Simulate the group stage
+        qualifiers <- qualify_r32()
+        
+        # Simulate the knockout stage
+        ko <- play_knockout(
+          qualifiers = qualifiers,
+          calendar = calendar_ko
+        )
+        
+        # Identify the teams that reached each stage
+        reached <- list(
+          R32 = qualifiers$team,
+          R16 = ko$winner[ko$round == "R32"],
+          QF = ko$winner[ko$round == "R16"],
+          SF = ko$winner[ko$round == "Quarter"],
+          Final = ko$winner[ko$round == "Semi"],
+          Champion = ko$winner[ko$round == "Final"]
+        )
+        
+        # Check the number of teams at each stage
+        if (!identical(
+          unname(lengths(reached)),
+          c(32L, 16L, 8L, 4L, 2L, 1L)
+        )) {
+          stop("Unexpected number of teams at a tournament stage.")
+        }
+        
+        # Update the counters
+        for (stage in stages) {
+          
+          participants <- reached[[stage]]
+          
+          if (anyNA(participants) ||
+              anyDuplicated(participants) ||
+              !all(participants %in% rownames(counts))) {
+            stop("Invalid participants at stage: ", stage)
+          }
+          
+          counts[participants, stage] <-
+            counts[participants, stage] + 1
+        }
+        
+        # Display calculation progress
+        if (i %% update_every == 0L || i == n) {
+          
+          shiny::setProgress(
+            value = i / n,
+            detail = paste(i, "of", n, "tournaments")
+          )
+        }
+      }
+    }
+  )
+  
+  # Convert counts to percentages
+  result <- data.frame(
+    team = rownames(counts),
+    elo = unname(rating[rownames(counts)]),
+    100 * counts / n,
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )
+  
+  # Sort by title probability, then final probability
+  result <- result[
+    order(-result$Champion, -result$Final),
+  ]
+  
+  rownames(result) <- NULL
+  
+  result
+}
+```
+
+```{r server, echo=FALSE}
+## generated by AI
+stage_columns <- c(
+  "R32", "R16", "QF", "SF", "Final", "Champion"
+)
+
+stage_labels <- c(
+  "Round of 32",
+  "Round of 16",
+  "Quarter-finals",
+  "Semi-finals",
+  "Final",
+  "Champion"
+)
+
+
+# Run Monte Carlo only when the button is clicked
+mc_run <- eventReactive(input$run_mc, {
+  
+  n <- input$n_simulations
+  seed <- input$simulation_seed
+  
+  validate(
+    need(
+      length(n) == 1L && !is.na(n) &&
+        n >= 100 && n <= 50000 && n == floor(n),
+      "Choose an integer between 100 and 50,000."
+    ),
+    
+    need(
+      length(seed) == 1L && !is.na(seed) &&
+        seed >= 1 && seed <= 1000000 && seed == floor(seed),
+      "Choose an integer seed between 1 and 1,000,000."
+    )
+  )
+  
+  set.seed(as.integer(seed))
+  
+  list(
+    predictions = run_mc_shiny(as.integer(n)),
+    n = n,
+    seed = seed
+  )
+})
+
+
+# Display the status of the Monte Carlo run
+output$simulation_status <- renderText({
+  
+  if (input$run_mc == 0) {
+    return("Click 'Run simulations' to generate predictions.")
+  }
+  
+  run <- mc_run()
+  
+  paste(
+    format(run$n, big.mark = ","),
+    "simulations completed — seed:",
+    run$seed
+  )
+})
+
+
+# TAB 1: display the ten favourites
+output$favourites_chart <- renderPlotly({
+  
+  req(input$run_mc > 0)
+  
+  top <- head(mc_run()$predictions, 10)
+  
+  top$team <- factor(
+    top$team,
+    levels = rev(top$team)
+  )
+  
+  plot_ly(
+    top,
+    x = ~Champion,
+    y = ~team,
+    type = "bar",
+    orientation = "h",
+    marker = list(color = "#2463A0"),
+    hovertemplate =
+      "%{y}<br>Title probability: %{x:.1f}%<extra></extra>"
+  ) %>%
+    layout(
+      title = "Who is most likely to win?",
+      
+      xaxis = list(
+        title = "Probability of winning",
+        ticksuffix = "%",
+        rangemode = "tozero"
+      ),
+      
+      yaxis = list(
+        title = "",
+        automargin = TRUE
+      )
+    )
+})
+
+
+# TAB 2: display the selected team's name
+output$team_title <- renderText({
+  input$selected_team
+})
+
+
+# Display its group and Elo
+output$team_details <- renderText({
+  
+  req(input$selected_team)
+  
+  team_id <- names(teams)[
+    match(input$selected_team, unname(teams))
+  ]
+  
+  paste0(
+    "Group: ", substr(team_id, 1, 1),
+    " | Elo: ", unname(rating[input$selected_team])
+  )
+})
+
+
+# Display its probabilities for each stage
+output$team_chart <- renderPlotly({
+  
+  req(input$run_mc > 0)
+  
+  predictions <- mc_run()$predictions
+  
+  selected <- predictions[
+    predictions$team == input$selected_team,
+    ,
+    drop = FALSE
+  ]
+  
+  probabilities <- as.numeric(
+    unlist(selected[stage_columns], use.names = FALSE)
+  )
+  
+  chart_data <- data.frame(
+    stage = factor(stage_labels, levels = stage_labels),
+    probability = probabilities
+  )
+  
+  plot_ly(
+    chart_data,
+    x = ~stage,
+    y = ~probability,
+    type = "bar",
+    marker = list(color = "#008577"),
+    hovertemplate =
+      "%{x}<br>Probability: %{y:.1f}%<extra></extra>"
+  ) %>%
+    layout(
+      title = "Probability of reaching each stage",
+      
+      xaxis = list(
+        title = "",
+        automargin = TRUE
+      ),
+      
+      yaxis = list(
+        title = "Probability",
+        range = c(0, 100),
+        ticksuffix = "%"
+      )
+    )
+})
+
+
+# TAB 3: simulate a single tournament when clicked
+single_run <- eventReactive(input$run_single, {
+  
+  qualifiers <- qualify_r32()
+  
+  matches <- play_knockout(
+    qualifiers = qualifiers,
+    calendar = calendar_ko
+  )
+  
+  list(
+    qualifiers = qualifiers,
+    matches = matches
+  )
+})
+
+
+# Display the champion
+output$single_champion <- renderUI({
+  
+  req(input$run_single > 0)
+  
+  matches <- single_run()$matches
+  
+  champion <- matches$winner[
+    matches$round == "Final"
+  ]
+  
+  div(
+    class = "wc-champion",
+    
+    div(
+      class = "wc-champion-label",
+      "Simulated champion"
+    ),
+    
+    div(
+      class = "wc-champion-name",
+      champion
+    )
+  )
+})
+
+
+# Display qualifiers in one card per group
+output$single_qualifiers <- renderUI({
+  
+  req(input$run_single > 0)
+  
+  qualifiers <- single_run()$qualifiers
+  
+  qualifiers$group <- substr(qualifiers$new_id, 2, 2)
+  qualifiers$position <- substr(qualifiers$new_id, 1, 1)
+  
+  group_cards <- lapply(LETTERS[1:12], function(letter) {
+    
+    group_teams <- qualifiers[
+      qualifiers$group == letter,
+      ,
+      drop = FALSE
+    ]
+    
+    group_teams <- group_teams[
+      order(group_teams$position),
+      ,
+      drop = FALSE
+    ]
+    
+    div(
+      class = "wc-card",
+      
+      div(
+        class = "wc-card-title",
+        paste("Group", letter)
+      ),
+      
+      lapply(seq_len(nrow(group_teams)), function(i) {
+        
+        div(
+          class = "wc-team",
+          
+          span(
+            class = "wc-position",
+            paste0(group_teams$position[i], ".")
+          ),
+          
+          group_teams$team[i]
+        )
+      })
+    )
+  })
+  
+  tagList(
+    
+    p(
+      "Each group shows its two automatic qualifiers and, where applicable, a qualifying third-placed team.",
+      style = "margin-top: 15px; color: #667085;"
+    ),
+    
+    div(
+      class = "wc-groups",
+      group_cards
+    )
+  )
+})
+
+
+# Display knockout matches in columns by round
+output$single_matches <- renderUI({
+  
+  req(input$run_single > 0)
+  
+  matches <- single_run()$matches
+  
+  rounds <- c(
+    "R32", "R16", "Quarter", "Semi", "Final"
+  )
+  
+  round_names <- c(
+    "Round of 32",
+    "Round of 16",
+    "Quarter-finals",
+    "Semi-finals",
+    "Final"
+  )
+  
+  # Create one match card
+  match_card <- function(match) {
+    
+    div(
+      class = "wc-card wc-match",
+      
+      div(
+        class = "wc-card-title",
+        paste("Match", match$match_no)
+      ),
+      
+      div(
+        class = if (match$team_a == match$winner) {
+          "wc-team wc-winner"
+        } else {
+          "wc-team"
+        },
+        
+        match$team_a
+      ),
+      
+      div(
+        class = if (match$team_b == match$winner) {
+          "wc-team wc-winner"
+        } else {
+          "wc-team"
+        },
+        
+        match$team_b
+      )
+    )
+  }
+  
+  # Order matches according to their paths through the bracket
+  bracket_order <- function(match_id) {
+    
+    row <- calendar_ko[
+      calendar_ko$match_no == match_id,
+      ,
+      drop = FALSE
+    ]
+    
+    if (row$round == "R32") {
+      return(as.character(match_id))
+    }
+    
+    c(
+      bracket_order(row$team_a),
+      bracket_order(row$team_b),
+      as.character(match_id)
+    )
+  }
+  
+  final_id <- matches$match_no[
+    matches$round == "Final"
+  ]
+  
+  ordered_ids <- bracket_order(final_id)
+  
+  # Create one column per round
+  round_columns <- lapply(seq_along(rounds), function(j) {
+    
+    round_matches <- matches[
+      matches$round == rounds[j],
+      ,
+      drop = FALSE
+    ]
+    
+    round_matches <- round_matches[
+      order(match(round_matches$match_no, ordered_ids)),
+      ,
+      drop = FALSE
+    ]
+    
+    div(
+      class = "wc-round",
+      
+      div(
+        class = "wc-round-title",
+        round_names[j]
+      ),
+      
+      lapply(seq_len(nrow(round_matches)), function(i) {
+        match_card(round_matches[i, , drop = FALSE])
+      })
+    )
+  })
+  
+  # Display the third-place match separately
+  third_match <- matches[
+    matches$round == "Third",
+    ,
+    drop = FALSE
+  ]
+  
+  tagList(
+    
+    div(
+      class = "wc-bracket",
+      round_columns
+    ),
+    
+    if (nrow(third_match) == 1) {
+      
+      div(
+        class = "wc-third",
+        
+        h4("Third-place play-off"),
+        
+        match_card(third_match)
+      )
+    }
+  )
+})
+```
+
+# Results
+
+We simulated the World Cup 1000 times to explore three main questions : which teams are the favourites to win the title, how far each team is expected to progress and which group-stage outcomes were the most surprising compared with the model's predictions.
+
+```{r run_mc}
+#fix the seed
+set.seed(123)  
+
+# run simulation
+mc_results <- run_cup_mc(1000)
+```
+
+## Who are the favourite ?
+
+```{r favourite}
+# select top 10 
+top_10 <- mc_results %>%
+  arrange(desc(Champion), desc(Final)) %>%
+  slice_head(n = 10) %>%
+  mutate(
+    team = factor(team, levels = rev(team))
+  )
+
+# Bar chart
+champion_plot <- ggplot(
+  top_10,
+  aes(x = Champion, y = team)
+) +
+  geom_col(
+    fill = "blue",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", Champion)),
+    hjust = -0.15,
+    size = 3.5
+  ) +
+  scale_x_continuous(
+    labels = function(x) paste0(x, "%"),
+    expand = expansion(mult = c(0, 0.18))
+  ) +
+  labs(
+    title = "Who is most likely to win the World Cup?",
+    x = "Probability of winning",
+    y = NULL
+  )
+
+# show plot
+champion_plot
+```
+
+Across the 1000 simulations, Spain has the highest estimated probability of winning the World Cup at 25.6%, followed by Argentina and France. Together, these three teams account for 65.2% of the title probability, which suggests that the model concentrates much of the winning potential among them.
+
+England ranks fourth with a probability of 10.3%. Spain is therefore approximately 2.5 times as likely to win as England, which highlights the gap between the leading favorite and the fourth-ranked team.
+
+## How far are teams expected to go ?
+
+Although Spain, Argentina and France account for most of the estimated title probability, it can also be useful to examine how far each team is likely to progress in the tournament.
+
+```{r stage_heatmap, fig.width=10, fig.height=15}
+# order of the stages
+stages <- c("R32", "R16", "QF", "SF", "Final", "Champion")
+
+# sort team by Elo 
+team_order <- mc_results %>%
+  arrange(desc(elo)) %>%
+  pull(team)
+
+# transform data 
+heatmap_data <- mc_results %>%
+  pivot_longer(
+    cols = all_of(stages),
+    names_to = "stage",
+    values_to = "probability"
+  ) %>%
+  mutate(
+    stage = factor(stage, levels = stages),
+    team = factor(team, levels = rev(team_order)),
+    
+    # avoid display 0%
+    label = if_else(
+      probability == 0,
+      "<0.1",
+      sprintf("%.1f", probability)
+    )
+  )
+
+# create heatmap
+heatmap_plot <- ggplot(
+  heatmap_data,
+  aes(x = stage, y = team, fill = probability)
+) +
+  geom_tile(color = "white", linewidth = 0.3) +
+  
+  # display probability in each cell 
+  geom_text(
+    aes(
+      label = label,
+      color = probability >= 50
+    ),
+    size = 2.6
+  ) +
+  
+  scale_color_manual(
+    values = c("TRUE" = "white", "FALSE" = "#222222"),
+    guide = "none"
+  ) +
+  
+  scale_fill_gradient(
+    low = "#F3F7FC",
+    high = "#084594",
+    limits = c(0, 100),
+    breaks = c(0, 25, 50, 75, 100),
+    labels = function(x) paste0(x, "%"),
+    name = "Probability"
+  ) +
+  
+  scale_x_discrete(
+    position = "top",
+    labels = c(
+      R32 = "Round of 32",
+      R16 = "Round of 16",
+      QF = "Quarter-finals",
+      SF = "Semi-finals",
+      Final = "Final",
+      Champion = "Champion"
+    ),
+    expand = c(0, 0)
+  ) +
+  
+  scale_y_discrete(expand = c(0, 0)) +
+  
+  labs(
+    title = "How far could each team go?",
+    subtitle = "Simulated probability of reaching each stage - Teams ranked by Elo",
+    x = NULL,
+    y = NULL,
+    caption = paste(
+      "Cell values are percentages.",
+      "<0.1 includes outcomes never observed in the simulations."
+    )
+  )
+
+heatmap_plot
+```
+
+The heatmap displays each team's probability of reaching each stage, with teams ordered by Elo rating from highest to lowest. It shows that a higher ranking does not always correspond to a higher probability of advancing.
+
+For example, Bosnia and Herzegovina has the tenth-lowest Elo rating but a 63.9% probability of qualifying for the round of 32. This exceeds the qualification probabilities of some higher-rated teams such as Algeria or the United States.
+
+## Which group-stage outcomes were the most surprising ?
+
+We compare each team's actual group-stage outcome with its simulated probability of reaching the round of 32. This allows us to identify unexpected qualifications, where teams advanced despite a low predicted probability, and unexpected eliminations, where teams failed to qualify despite a high predicted probability.
+
+The actual results were :
+
+```{r actual_results}
+# load data
+actual_results <- read.csv2(
+  here("data", "actual_stage.csv"),
+  colClasses = "character",
+  stringsAsFactors = FALSE,
+  fileEncoding = "UTF-8"
+) %>%
+  rename(team = country) %>%
+  mutate(
+    team = trimws(team),
+    actual_stage = toupper(trimws(actual_stage))
+  )
+
+actual_results
+```
+
+The qualification probability is the proportion of Monte Carlo simulations in which a team reached the round of 32. We then use the actual result to select the probability assigned by the model to the observed outcome. If the team qualified, we use its qualification probability. If it was eliminated, we use 1 - its qualification probability. Therefore, lower observed-outcome probabilities indicate more surprising results according to the model.
+
+```{r group_surprises_plot}
+group_surprises <- mc_results %>%
+  select(team, R32) %>%
+  left_join(actual_results, by = "team") %>%
+  mutate(
+    qualified = actual_stage != "GROUP",
+    
+    outcome = if_else(
+      qualified,
+      "Qualified",
+      "Eliminated"
+    ),
+    
+    # observed probability
+    observed_probability = if_else(
+      qualified,
+      R32,
+      100 - R32
+    )
+  ) %>%
+  arrange(R32, team) %>%
+  mutate(team = factor(team, levels = team))
+
+# plot 
+surprises_plot <- ggplot(
+  group_surprises,
+  aes(x = R32, y = team, color = outcome)
+) +
+  geom_vline(
+    xintercept = 50,
+    linetype = "dashed",
+    color = "grey75"
+  ) +
+  geom_point(size = 3) +
+  scale_color_manual(
+    name = "Actual outcome",
+    values = c(
+      "Qualified" = "#008577",
+      "Eliminated" = "#C45A35"
+    )
+  ) +
+  scale_x_continuous(
+    limits = c(0, 100),
+    breaks = seq(0, 100, 25),
+    labels = function(x) paste0(x, "%")
+  ) +
+  labs(
+    title = "Group-stage surprises",
+    subtitle = "Predicted qualification probability and actual outcome",
+    x = "Simulated probability of reaching the round of 32",
+    y = NULL,
+    caption = "The dashed line marks 50%; it is a visual reference, not a qualification threshold."
+  ) 
+
+# show plot
+surprises_plot
+
+```
+
+The teams are ordered by their predicted probability of reaching the round of 32.The most unexpected outcomes are therefore qualifications at the low-probability end and eliminations at the high-probability end. However, an outcome close to 50% is relatively uncertain in either direction.
+
+The dashed line at 50% separates teams that the model considered more likely to qualify than to be eliminated from those for which elimination was more likely. It serves only as a visual reference.
+
+The table below highlights the five least likely group-stage outcomes according to the model. Teams are ranked by the predicted probability of the outcome actually observed : qualification for teams that advanced and elimination for those that did not. Lower probabilities indicate more surprising outcomes.
+
+```{r top_surprises}
+top_surprises <- group_surprises %>%
+  arrange(observed_probability) %>%
+  slice_head(n = 5) %>%
+  select(
+    team,
+    qualification_probability = R32,
+    outcome,
+    observed_probability
+  )
+
+top_surprises
+```
+
+Uruguay's elimination was the most surprising group-stage outcome according to the model. It had an 82.8% probability of qualifying, meaning its elimination had a predicted probability of only 17.2%. Turkey, South Korea and Iran were also eliminated despite qualification probabilities above 70%.
+
+Ghana showed the opposite pattern, qualifying despite a predicted qualification probability of only 28.5%. These results illustrate both unexpected eliminations and an unexpected qualification.
+
+# Conclusion and limitations
+
+We reconstructed the 2026 World Cup using the official group composition and knockout schedule, with match outcomes simulated using Elo ratings and a separate model for draws. By repeating the tournament 1000 times, we estimated each team's probability of reaching each stage and winning the title.
+
+Spain emerged as the favorite, followed by Argentina and France. Spain and Argentina also reached the final in the actual results used for the comparison.
+
+The heatmap showed that team strength alone does not determine tournament outcomes. Some lower-rated teams had higher qualification probabilities than stronger teams, which illustrate the importance of group opponents.
+
+Comparing simulated qualification probabilities with actual outcomes also highlighted unexpected eliminations, such as Uruguay's, and unexpected qualifications, such as Ghana's. These outcomes were relatively unlikely according to the model.
+
+Our model has several limitations. A football match depends on more than the difference between two Elo ratings. Player form, injuries and red cards can influence the result. Weather, travel and fatigue may also affect how teams perform, but these factors are not included in the simulation. In addition, deciding to break ties randomly and setting the draw parameters ourselves might also influence the results.
+
+Overall, the simulation helped us identify the favorite, explore possible team journeys and compare expectations with actual outcomes.

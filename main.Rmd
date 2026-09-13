@@ -1,9 +1,8 @@
 ---
 title: "Title"
 subtitle: "SDA01"
-output: 
-  html_document:
-    code_folding: hide
+output: html_document
+runtime: shiny
 ---
 
 # Introduction
@@ -60,3 +59,19 @@ sum(duplicated(d.full[c("year", "country")]))
 write.csv(d.wc, "data/wc_elo_ratings.csv", row.names = FALSE)
 write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
 ```
+
+.....
+
+# World Cup Simulation
+
+```{r wc_simulation, child="scripts/world_cup_simulation.Rmd"}
+
+```
+
+# Sources
+
+<https://eloratings.net/about>
+
+<https://footystats.org/world-cup>
+
+<https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf>
