@@ -1,0 +1,211 @@
+---
+title: "world_cup_cluster"
+output: html_document
+runtime: shiny
+---
+
+```{r setup-cluster, include=FALSE}
+library(here)
+library(tidyverse)
+library(shiny)
+library(DT)
+library(gt)
+library(plotly)
+library(dtw)
+library(dtwclust) 
+```
+
+```{r data, echo=FALSE}
+# Load data
+d.full <- read.csv(here("data", "elo_ratings.csv"))
+```
+
+This section investigates whether qualified countries can be grouped into archetypes based on the trajectory of their Elo rating over time, and identifies the key features distinguishing each cluster. Each country's full historical Elo rating curve was clustered directly using Dynamic Time Warping (DTW), a distance measure that compares the shape of two time series while accounting for differences in length and timing. 
+
+The analysis identified three trajectory archetypes, plus one statistical outlier:
+
+- **Elite (Traditional Power)**: Brazil, Germany, France, England, Argentina, and Spain have maintained a consistently high rating throughout their history, with comparatively little long-term movement.
+- **Rising / Mid-Tier**: Japan, Ecuador, Colombia, Cape Verde, and Jordan began from a markedly lower base but show a sustained, accelerating upward trajectory.
+- **Broad Mid-Tier**: the largest and most heterogeneous group, comprising teams such as Norway, Switzerland, and Iran that have remained within a stable middle band of ratings without a clear long-term trend.
+- **Curaçao** was flagged as a statistical outlier and excluded from the main clustering on account of its short, unusually volatile rating history.
+
+
+```{r cluster-traj, include=FALSE}
+# ---- 1. Build one time series per country (raw Elo rating by year) ----
+country_series <- d.full %>%
+  filter(n() >= 8, .by = country) %>%
+  arrange(country, year) %>%
+  group_split(country) %>%
+  set_names(map_chr(., ~ .x$country[1])) %>%
+  map(~ .x$rating)
+ 
+# ---- 2. Detect outliers from the distance matrix ----
+# Test: nearest-neighbor distance.
+dist_mat_full <- proxy::dist(country_series, method = "dtw_basic")
+dist_mat_full <- as.matrix(dist_mat_full)
+diag(dist_mat_full) <- NA
+ 
+nn_dist <- apply(dist_mat_full, 1, min, na.rm = TRUE)
+nn_z <- (nn_dist - mean(nn_dist)) / sd(nn_dist)
+ 
+outlier_check <- tibble(country = names(country_series), nn_dist = nn_dist, z = nn_z) %>%
+  arrange(desc(z))
+print(outlier_check)
+ 
+outlier_countries <- outlier_check %>% filter(z > 3) %>% pull(country)
+print(paste("Flagged as outliers:", paste(outlier_countries, collapse = ", ")))
+ 
+country_series_main <- country_series[!names(country_series) %in% outlier_countries]
+ 
+# ---- 3. Hierarchical clustering with DTW distance (average linkage) ----
+set.seed(42)
+hc <- tsclust(
+  country_series_main,
+  type = "hierarchical",
+  k = 3,                      # chosen via silhouette search below
+  distance = "dtw_basic",
+  control = hierarchical_control(method = "average")
+)
+ 
+# ---- 3b. Silhouette search to confirm k=3 (re-run if your data differs) ----
+sil_scores <- map_dbl(2:7, function(k) {
+  hc_k <- tsclust(country_series_main, type = "hierarchical", k = k,
+                   distance = "dtw_basic", control = hierarchical_control(method = "average"))
+  dtwclust::cvi(hc_k, type = "Sil")
+})
+print(tibble(k = 2:7, silhouette = round(sil_scores, 3)))
+ 
+# ---- 4. Assign archetype names for clusters ----
+cluster_labels <- tibble(
+  country = names(country_series_main),
+  cluster = hc@cluster
+)
+ 
+cluster_rating <- d.full %>%
+  filter(country %in% cluster_labels$country) %>%
+  group_by(country) %>%
+  filter(year == max(year)) %>%
+  ungroup() %>%
+  inner_join(cluster_labels, by = "country") %>%
+  group_by(cluster) %>%
+  summarise(mean_current_rating = mean(rating), n = n())
+ 
+cluster_trend <- d.full %>%
+  filter(country %in% cluster_labels$country) %>%
+  inner_join(cluster_labels, by = "country") %>%
+  filter(year >= max(year) - 15, .by = country) %>%
+  group_by(cluster) %>%
+  summarise(recent_slope = coef(lm(rating ~ year))[2])
+ 
+cluster_rating <- cluster_rating %>%
+  left_join(cluster_trend, by = "cluster") %>%
+  arrange(desc(mean_current_rating))
+ 
+print(cluster_rating)
+ 
+archetype_map <- cluster_rating %>%
+  mutate(archetype = case_when(
+    mean_current_rating == max(mean_current_rating) ~ "Elite (Traditional Power)",
+    recent_slope == max(recent_slope)                ~ "Rising / Mid-Tier",
+    TRUE                                              ~ "Broad Mid-Tier"
+  )) %>%
+  select(cluster, archetype) %>%
+  deframe()
+ 
+cluster_labels <- cluster_labels %>%
+  mutate(archetype = recode(as.character(cluster), !!!archetype_map))
+ 
+cluster_labels <- cluster_labels %>%
+  bind_rows(tibble(country = outlier_countries, cluster = NA,
+                    archetype = paste0("Outlier (", outlier_countries, ")")))
+ 
+archetype_colors <- c(
+  "Elite (Traditional Power)" = "#6250d6",
+  "Rising / Mid-Tier"         = "#1baf7a",
+  "Broad Mid-Tier"            = "#eb6834"
+)
+outlier_labels <- unique(cluster_labels$archetype[startsWith(cluster_labels$archetype, "Outlier")])
+archetype_colors <- c(archetype_colors, set_names(rep("#999999", length(outlier_labels)), outlier_labels))
+```
+
+```{r fig-cluster, echo=FALSE, warning=FALSE}
+
+# ---- 5. Spaghetti plot by cluster ----
+d.trajectories <- d.full %>%
+  inner_join(cluster_labels %>% select(country, archetype), by = "country")
+ 
+cluster_means <- d.trajectories %>%
+  filter(!startsWith(archetype, "Outlier")) %>%
+  group_by(archetype, year) %>%
+  summarise(mean_rating = mean(rating), .groups = "drop")
+ 
+p_spaghetti <- ggplot(d.trajectories,
+                       aes(x = year, y = rating, group = country,
+                           text = paste0(country, "<br>", year, ": ", round(rating)))) +
+  geom_line(aes(color = archetype), alpha = 0.35, linewidth = 0.5) +
+  geom_line(data = cluster_means,
+            aes(x = year, y = mean_rating, group = 1, color = archetype,
+                text = paste0(archetype, " mean<br>", year, ": ", round(mean_rating))),
+            linewidth = 1.3, inherit.aes = FALSE) +
+  facet_wrap(~ archetype) +
+  scale_color_manual(values = archetype_colors, guide = "none") +
+  labs(title = "Elo Trajectories by DTW Cluster", x = NULL, y = "Elo Rating") +
+  theme_minimal(base_size = 12) +
+  theme(strip.text = element_text(face = "bold"), panel.grid.minor = element_blank())
+ 
+fig_spaghetti <- ggplotly(p_spaghetti, tooltip = "text") %>%
+  layout(title = list(text = "Elo Trajectories by DTW Cluster"))
+ 
+fig_spaghetti
+ 
+# ---- 6. MDS map with STRAIGHT-LINE convex hulls ----
+# geom_mark_hull() draws a smoothed/rounded concave boundary. For straight
+# polygon edges instead, compute each cluster's convex hull manually with
+# chull() and draw it as a plain geom_polygon().
+mds_coords <- cmdscale(as.dist(dist_mat_full), k = 2)
+ 
+d.mds <- tibble(
+  country = names(country_series),
+  x = mds_coords[, 1],
+  y = mds_coords[, 2]
+) %>%
+  left_join(cluster_labels %>% select(country, archetype), by = "country")
+
+# straight-edge convex hull per archetype (needs >= 3 points)
+hull_polys <- d.mds %>%
+  filter(!is.na(archetype)) %>%
+  group_by(archetype) %>%
+  filter(n() >= 3) %>%
+  slice(chull(x, y)) %>%
+  ungroup()
+ 
+ggplot(d.mds, aes(x, y, color = archetype)) +
+  geom_polygon(data = hull_polys, aes(x = x, y = y, group = archetype, fill = archetype),
+               alpha = 0.08, linewidth = 0.8) +
+  geom_point(size = 3) +
+  ggrepel::geom_text_repel(aes(label = country), size = 3, show.legend = FALSE) +
+  scale_color_manual(values = archetype_colors, name = NULL) +
+  scale_fill_manual(values = archetype_colors, guide = "none") +
+  labs(title = "DTW Trajectory Clustering: MDS Map",
+       x = "MDS dimension 1", y = "MDS dimension 2") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top", panel.grid.minor = element_blank())
+```
+
+```{r tbl-cluster, include=FALSE}
+# ---- 7. Summary table ----
+t.dtw_summary <- d.full %>%
+  group_by(country) %>%
+  filter(year == max(year)) %>%
+  ungroup() %>%
+  transmute(country, confederation, current_rating = rating,
+            years_active = NA_integer_) %>%
+  rows_update(
+    d.full %>% count(country, name = "years_active"),
+    by = "country"
+  ) %>%
+  inner_join(cluster_labels %>% select(country, archetype), by = "country") %>%
+  arrange(archetype, desc(current_rating))
+ 
+print(t.dtw_summary, n = Inf)
+```

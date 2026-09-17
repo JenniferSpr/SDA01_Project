@@ -1,0 +1,733 @@
+---
+title: "World_cup_descriptive"
+output: html_document
+runtime: shiny
+---
+
+```{r lib, include=FALSE}
+
+library(here)
+library(tidyverse)
+library(shiny)
+library(DT)
+library(paletteer)
+library(patchwork)
+library(forcats)
+library(broom)
+library(purrr)
+library(ggrepel)
+library(gt)
+library(plotly)
+```
+
+```{r setup, echo=FALSE}
+
+# Load data
+d.full <- read.csv(here("data", "elo_ratings.csv"))
+
+year_min <- min(d.full$year)
+year_max <- max(d.full$year)
+
+all_countries <- sort(unique(d.full$country))
+
+default_countries <- d.full %>%
+  filter(year == max(year)) %>%
+  slice_max(rating, n = 10) %>%
+  pull(country)
+
+country_colors <- setNames(scales::hue_pal()(length(all_countries)), all_countries)
+
+```
+
+## Country Statistics Overview
+
+This table summarizes each qualified country's Elo statistics as of its most recent recorded year, including mean, minimum, and maximum rating; best and worst FIFA rank achieved; and overall win percentage. 
+
+Across the 48 qualified nations, Brazil leads on mean historical Elo rating (1,998), followed closely by Argentina (1,987) and England (1,983), reflecting their sustained dominance across the full observation window. In contrast, Cape Verde holds the lowest mean Elo rating (1,302). Brazil also posts the highest career win rate (63.0%), ahead of Spain (59.2%) and England (59.0%). 
+
+```{r tbl-sum, echo=FALSE}
+
+# Summarize statistics by country
+t.summary <- d.full %>%
+  group_by(country) %>%
+  mutate(win_pct = round(wins / matches_total * 100, 2)) %>%
+  summarise(
+    mean_rating  = rating_avg[which.max(year)],
+    min_rating   = rating_min[which.max(year)],
+    max_rating   = rating_max[which.max(year)],
+    min_ranking  = rank_min[which.max(year)],
+    max_ranking  = rank_max[which.max(year)],
+    win_percent  = win_pct[which.max(year)]
+  )
+
+# Show table
+datatable(t.summary, 
+          colnames = c(
+            "Country"      = "country",
+            "Mean Rating"  = "mean_rating",
+            "Min Rating"   = "min_rating",
+            "Max Rating"   = "max_rating",
+            "Worst Rank"    = "min_ranking",
+            "Best Rank"   = "max_ranking",
+            "Win %"        = "win_percent"
+          )) %>%
+  formatRound(columns = c("Mean Rating", "Min Rating", "Max Rating"), digits = 0) %>%
+  formatRound(columns = "Win %", digits = 1) 
+```
+
+## Elo Ratings Overview
+
+This interactive dashboard supports four complementary views of Elo ratings: top N teams by rating in a given year, individual country trajectories over a selected time range, average trajectories by confederation, and each team's gap between its current and all-time-high rating.
+
+As of the most recent snapshot (2026), Spain (2,177) and Argentina (2,151) lead the rankings, followed by France, England, and Colombia. At the confederation level, CONMEBOL narrowly leads UEFA in current average rating (1,946.5 vs. 1,903.8), with CAF, CONCACAF, and AFC clustered around 1,660 – 1,700 and OFC trailing at 1,534. CONMEBOL's average overtook UEFA's for good starting in 2006 and has held the lead since. CAF, CONCACAF, and AFC all show a visible upward climb in recent decades, narrowing their gap with the two leading confederations, while OFC has remained comparatively flat and furthest behind throughout the period shown.
+
+Looking at each team's distance from its own historical peak, Qatar (−360), Scotland (−359), and Czechia (−352) show the largest gaps between current and all-time-high rating, pointing to sustained decline from a stronger past. France, Norway, and Switzerland, by contrast, sit at their all-time peak (gap = 0), indicating they are currently playing at the strongest level in their history.
+
+```{r, echo=FALSE}
+
+ui <- fluidPage(
+
+  tags$style(HTML("
+    .main-container { max-width: 100% !important; width: 100% !important; }
+    body { max-width: 100% !important; }
+
+    .elo-app {
+      width: 100%;
+      padding: 20px;
+      border: 1px solid #dfe5eb;
+      border-radius: 12px;
+      background: white;
+      box-sizing: border-box;
+    }
+
+    .elo-controls {
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
+      background: #f7f8fa;
+      border: 1px solid #e3e7eb;
+      border-radius: 10px;
+      padding: 16px 24px;
+      margin-bottom: 20px;
+    }
+
+    .elo-control-group {
+      flex: 1 1 0%;
+      min-width: 220px;
+    }
+
+    .elo-control-group h4 {
+      margin: 0 0 6px;
+      color: #243b53;
+    }
+
+    .elo-main {
+      min-width: 0;
+    }
+
+    .elo-country-picker {
+      max-width: 600px;
+      margin-bottom: 12px;
+    }
+
+    .elo-sort-picker {
+      max-width: 320px;
+      margin-bottom: 12px;
+    }
+  ")),
+
+  div(
+    class = "elo-app",
+
+    #h2("Global Football Power — Elo Ratings"),
+
+    div(
+      class = "elo-controls",
+
+      div(
+        class = "elo-control-group",
+        h4("Top N teams"),
+        sliderInput("top_n", NULL, min = 3, max = 20, value = 10, step = 1, width = "100%")
+      ),
+
+      div(
+        class = "elo-control-group",
+        h4("Year range"),
+        sliderInput("year_range", NULL,
+                    min = year_min, max = year_max,
+                    value = c(year_min, year_max), sep = "", width = "100%")
+      )
+    ),
+
+    div(
+      class = "elo-main",
+      tabsetPanel(
+        tabPanel("Top Teams",
+          br(),
+          textOutput("bar_caption"),
+          plotlyOutput("bar_chart", height = "700px")
+        ),
+        tabPanel("Trend by Country",
+          br(),
+          div(
+            class = "elo-country-picker",
+            selectInput("trend_countries", "Select countries to show:",
+                        choices = all_countries,
+                        selected = default_countries,
+                        multiple = TRUE,
+                        width = "100%")
+          ),
+          plotlyOutput("country_trend", height = "700px")
+        ),
+        tabPanel("Trend by Confederation",
+          br(),
+          plotlyOutput("confed_trend", height = "700px")
+        ),
+        tabPanel("Rating Gap",
+          br(),
+          div(
+            class = "elo-sort-picker",
+            selectInput("gap_sort", "Sort by:",
+                        choices = c("Current rating" = "rating",
+                                    "All-time max rating" = "rating_max",
+                                    "Difference (current − max)" = "rating_gap"),
+                        selected = "rating",
+                        width = "100%")
+          ),
+          h4(textOutput("gap_caption")),
+          plotlyOutput("gap_chart", height = "1300px")
+        )
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+
+  snapshot_year <- reactive({
+    max(input$year_range)
+  })
+
+  top_n_countries <- reactive({
+    d.full %>%
+      filter(year == snapshot_year()) %>%
+      slice_max(rating, n = input$top_n) %>%
+      pull(country)
+  })
+
+  gap_data <- reactive({
+    d.full %>%
+      filter(year == snapshot_year()) %>%
+      mutate(rating_gap = rating - rating_max) %>%
+      select(country, rating, rating_max, rating_gap)
+  })
+
+  output$bar_caption <- renderText({
+    paste0("Showing top ", input$top_n, " teams as of ", snapshot_year())
+  })
+
+  output$bar_chart <- renderPlotly({
+    teams <- top_n_countries()
+
+    d.bar <- d.full %>%
+      filter(year == snapshot_year(), country %in% teams) %>%
+      mutate(country = factor(country, levels = teams),
+             tooltip_text = paste0(country, "<br>Rating: ", rating))
+
+    p <- ggplot(d.bar, aes(x = reorder(country, -rating), y = rating,
+                            text = tooltip_text)) +
+      geom_col(fill = "#1D9E75") +
+      labs(
+        title = paste0("Top ", input$top_n, " Teams by Elo Rating (",
+                        snapshot_year(), ")"),
+        x = NULL, y = "Elo Rating"
+      ) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    ggplotly(p, tooltip = "text") %>%
+      layout(autosize = TRUE)
+  })
+
+  output$country_trend <- renderPlotly({
+    yrs <- input$year_range
+    teams <- input$trend_countries
+
+    validate(need(length(teams) > 0, "Select at least one country above."))
+
+    d.trend <- d.full %>%
+      filter(country %in% teams, year >= yrs[1], year <= yrs[2]) %>%
+      mutate(country = factor(country, levels = teams),
+             tooltip_text = paste0(country, "<br>Year: ", year,
+                                    "<br>Rating: ", rating))
+
+    pal <- country_colors[teams]
+
+    p <- ggplot(d.trend, aes(x = year, y = rating, color = country,
+                              group = country, text = tooltip_text)) +
+      geom_line(linewidth = 1, alpha = 0.7) +
+      scale_color_manual(values = pal, name = NULL) +
+      scale_x_continuous(breaks = function(x) pretty(x, n = 8)) +
+      labs(
+        title = paste0("Elo Rating Trajectory (", yrs[1], "–", yrs[2], ")"),
+        x = NULL, y = NULL
+      ) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    ggplotly(p, tooltip = "text") %>%
+      layout(autosize = TRUE)
+  })
+
+    output$confed_trend <- renderPlotly({
+    yrs <- input$year_range
+
+    d.trend <- d.full %>%
+      filter(year >= yrs[1], year <= yrs[2]) %>%
+      group_by(year, confederation) %>%
+      summarise(avg_rating = mean(rating), .groups = "drop") %>%
+      mutate(tooltip_text = paste0(confederation, "<br>Year: ", year,
+                                    "<br>Avg rating: ", round(avg_rating, 1)))
+
+    p <- ggplot(d.trend, aes(x = year, y = avg_rating, color = confederation,
+                              group = confederation, text = tooltip_text)) +
+      geom_line(linewidth = 1, alpha = 0.8) +
+      scale_color_paletteer_d("ggthemes::Classic_10") +
+      scale_x_continuous(breaks = function(x) pretty(x, n = 8)) +
+      labs(
+        title = paste0("Average Elo Rating by Confederation (", yrs[1],
+                        "–", yrs[2], ")"),
+        x = NULL, y = NULL, color = NULL
+      ) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    ggplotly(p, tooltip = "text") %>%
+      layout(autosize = TRUE)
+  })
+
+  output$gap_caption <- renderText({
+    paste0("Current vs. all-time max Elo rating (", snapshot_year(), ")")
+  })
+  
+# Gap chart
+  output$gap_chart <- renderPlotly({
+    sort_var <- input$gap_sort
+
+    d <- gap_data() %>%
+      arrange(desc(.data[[sort_var]]))
+
+    country_order <- d$country
+
+    d <- d %>%
+      mutate(
+        country = factor(country, levels = rev(country_order)),
+        diff_label = paste0(ifelse(rating_gap > 0, "+", ""), rating_gap),
+        diff_color = ifelse(rating_gap >= 0, "#1D9E75", "#BF2F24"),
+        hover_current = paste0(country, "<br>Current: ", rating),
+        hover_max = paste0(country, "<br>All-time max: ", rating_max)
+      )
+
+    annotations <- lapply(seq_len(nrow(d)), function(i) {
+      list(
+        x = 1.02, xref = "paper",
+        y = d$country[i], yref = "y",
+        text = d$diff_label[i],
+        showarrow = FALSE,
+        font = list(color = d$diff_color[i], size = 11),
+        xanchor = "left"
+      )
+    })
+
+    plot_ly() %>%
+      add_segments(
+        data = d,
+        x = ~rating, xend = ~rating_max,
+        y = ~country, yend = ~country,
+        line = list(color = "#E7E7E7", width = 6),
+        showlegend = FALSE, hoverinfo = "skip"
+      ) %>%
+      add_markers(
+        data = d,
+        x = ~rating, y = ~country,
+        marker = list(color = "#436685", size = 10),
+        name = "Current",
+        text = ~hover_current, hoverinfo = "text"
+      ) %>%
+      add_markers(
+        data = d,
+        x = ~rating_max, y = ~country,
+        marker = list(color = "#BF2F24", size = 10),
+        name = "All-time max",
+        text = ~hover_max, hoverinfo = "text"
+      ) %>%
+      layout(
+        xaxis = list(title = "Elo rating"),
+        yaxis = list(title = "", automargin = TRUE),
+        margin = list(r = 90, t = 40, b = 40),
+        annotations = annotations,
+        legend = list(orientation = "h", x = 0.5, y = 1, xanchor = "center", yanchor = "bottom"),
+        autosize = TRUE
+      ) %>%
+      config(responsive = TRUE)
+  })
+}
+
+shinyApp(ui, server, options = list(width = "100%", height = "1450px"))
+```
+
+## Is There a Home Advantage?
+
+This analysis examines whether teams that play a larger share of their matches on home are associating with higher win rates. For each country, the share of matches played at home is plotted against overall win rate, with points colored by current Elo rating and with a linear fit to summarize the relationship. 
+
+Across all 48 teams, the correlation between the share of matches played at home and overall win rate is weak (r = 0.14). While the regression line has a positive slope, the relationship explains very little of the variance in win rate, suggesting that home-field advantage is not a strong driver of overall win rate once other factors are left uncontrolled.
+
+```{r, echo=FALSE, message=FALSE}
+#| label: home-advantage
+
+d.home <- d.full %>%
+  group_by(country) %>%
+  filter(year == 2026) %>%
+  ungroup() %>%
+  mutate(home_share = matches_home / matches_total,
+         win_rate = wins / matches_total)
+
+# correlation of the two variables
+corr <- cor(d.home$home_share, d.home$win_rate)
+
+# regression line coordinates
+fit <- lm(win_rate ~ home_share, data = d.home)
+line_x <- seq(min(d.home$home_share), max(d.home$home_share), length.out = 100)
+line_y <- predict(fit, newdata = data.frame(home_share = line_x))
+
+notable_teams <- c("Brazil", "Spain", "England", "France",
+                    "Iraq", "United States", "South Africa", "Ecuador")
+
+d.home <- d.home %>%
+  mutate(hover_text = paste0(
+    country,
+    "<br>Home share: ", scales::percent(home_share, accuracy = 0.1),
+    "<br>Win rate: ", scales::percent(win_rate, accuracy = 0.1),
+    "<br>Elo rating: ", rating
+  ))
+
+# RColorBrewer's Spectral palette, low -> high
+spectral_colors <- c("#9E0142", "#D53E4F", "#F46D43", "#FDAE61", "#FEE08B",
+                      "#FFFFBF", "#E6F598", "#ABDDA4", "#66C2A5", "#3288BD", "#5E4FA2")
+
+n <- length(spectral_colors)
+spectral_scale <- lapply(seq_along(spectral_colors), function(i) {
+  list((i - 1) / (n - 1), spectral_colors[i])
+})
+
+plot_ly() %>%
+  add_lines(
+    x = line_x, y = line_y,
+    line = list(color = "black", dash = "dash", width = 1.5),
+    showlegend = FALSE, hoverinfo = "skip"
+  ) %>%
+  add_markers(
+    data = d.home,
+    x = ~home_share, y = ~win_rate,
+    marker = list(
+      color = ~rating,
+      colorscale = spectral_scale,
+      size = 10,
+      opacity = 0.85,
+      colorbar = list(title = "Current<br>Elo rating")
+    ),
+    text = ~hover_text, hoverinfo = "text",
+    showlegend = FALSE
+  ) %>%
+  layout(
+    title = list(
+      text = paste0("Home advantage vs. win rate<br><sup>Correlation (r) = ",
+                     round(corr, 2), "</sup>")
+    ),
+    xaxis = list(title = "Share of matches played at home", tickformat = ".0%"),
+    yaxis = list(title = "Win rate", tickformat = ".0%"),
+    margin = list(t = 80),
+    autosize = TRUE
+  )
+```
+
+## Host country effect on Elo ratings
+
+This section investigates whether hosting the World Cup is associated with a measurable change in a nation's Elo rating, independent of match outcomes. For each of the 19 historical hosts (1930–2022), Elo ratings are compared across three stages, the three-year pre-host average, the host year itself, and one year after hosting, to assess whether host nations experience a rating bump during the tournament, and whether any such bump persists or reverts afterward.
+
+Across the 19 historical World Cup hosts, the largest bumps were seen by England 1966 (+149), Argentina 1978 (+139), and Sweden 1958 (+115), while Qatar 2022 (−79) and Mexico 1970 (−67) were notable exceptions that declined during their hosting year. 
+
+```{r host-effect-setup, echo=FALSE}
+
+# Host nations, 1930-2022
+host_events <- tribble(
+  ~year, ~country,
+  1930, "Uruguay",
+  1938, "France",
+  1950, "Brazil",
+  1954, "Switzerland",
+  1958, "Sweden",
+  1966, "England",
+  1970, "Mexico",
+  1974, "Germany",
+  1978, "Argentina",
+  1982, "Spain",
+  1986, "Mexico",
+  1994, "United States",
+  1998, "France",
+  2002, "South Korea",
+  2002, "Japan",
+  2006, "Germany",
+  2010, "South Africa",
+  2014, "Brazil",
+  2022, "Qatar"
+)
+
+# For each host event, compute:
+#    pre_avg      = mean rating over the 3 years before hosting
+#    host_rating  = rating in the host year
+#    post_rating  = rating 1 year after hosting
+get_host_stats <- function(host_year, host_country) {
+  sub <- d.full %>% filter(country == host_country)
+
+  pre_years <- seq(host_year - 3, host_year - 1)
+  pre_avg <- sub %>% filter(year %in% pre_years) %>% summarise(m = mean(rating)) %>% pull(m)
+
+  host_rating <- sub %>% filter(year == host_year) %>% pull(rating)
+  post_rating <- sub %>% filter(year == host_year + 1) %>% pull(rating)
+
+  if (length(host_rating) == 0 || length(post_rating) == 0 || is.nan(pre_avg)) {
+    return(NULL)
+  }
+
+  tibble(
+    country = host_country,
+    year = host_year,
+    pre_avg = pre_avg,
+    host_rating = host_rating,
+    post_rating = post_rating
+  )
+}
+
+host_stats <- map2(host_events$year, host_events$country, get_host_stats) %>%
+  list_rbind() %>%
+  mutate(
+    label = paste(country, year),
+    bump_during = host_rating - pre_avg,      # host year vs pre-host baseline
+    reversion   = post_rating - host_rating,  # post-year vs host year
+    net_after   = post_rating - pre_avg       # post-year vs pre-host baseline
+  ) %>%
+  arrange(bump_during)
+
+```
+
+```{r fig-host-effect, echo=FALSE, fig.height=8}
+
+plot_data <- host_stats %>%
+  select(label, year, bump_during, pre_avg, host_rating, post_rating) %>%
+  pivot_longer(
+    cols = c(pre_avg, host_rating, post_rating),
+    names_to = "stage",
+    values_to = "rating"
+  ) %>%
+  mutate(
+    stage = factor(stage,
+                    levels = c("pre_avg", "host_rating", "post_rating"),
+                    labels = c("3yr pre-host avg", "Host year", "1 year after")),
+    label = fct_reorder(label, year)
+  )
+
+host_bump_plot <- ggplot(plot_data, aes(x = rating, y = label)) +
+  geom_line(aes(group = label), color = "grey70", linewidth = 0.6) +
+  geom_point(aes(color = stage), size = 3) +
+  scale_color_manual(values = c(
+    "3yr pre-host avg" = "#888780",
+    "Host year"        = "#1D9E75",
+    "1 year after"     = "#D85A30"
+  )) +
+  labs(
+    title = "Elo rating before, during, and after hosting the World Cup",
+    subtitle = paste0(nrow(host_stats), " historical hosts, sorted by size of the host-year bump"),
+    x = "Elo rating",
+    y = NULL,
+    color = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.major.y = element_blank(),
+    legend.position = "top"
+  )
+
+host_bump_plot
+```
+
+The host effect was evaluated using Elo ratings for all `r count(host_stats)` historical hosts, comparing the three-year pre-host average to the host year, and the host year to one year post-host, using paired t-tests and Wilcoxon signed-rank tests (the latter as a robustness check given the small sample size).
+
+```{r host-effect-tests, echo=FALSE}
+
+# (a) Pre-host baseline vs host year -> is there a bump?
+t_pre_vs_host <- t.test(host_stats$host_rating, host_stats$pre_avg,
+                         paired = TRUE)
+
+# (b) Host year vs post-host year -> does the bump revert?
+t_host_vs_post <- t.test(host_stats$post_rating, host_stats$host_rating,
+                          paired = TRUE)
+
+# (c) Nonparametric checks (Wilcoxon signed-rank), since n is small
+w_pre_vs_host  <- wilcox.test(host_stats$host_rating, host_stats$pre_avg,
+                               paired = TRUE)
+w_host_vs_post <- wilcox.test(host_stats$post_rating, host_stats$host_rating,
+                               paired = TRUE)
+```
+
+Both tests agree: hosting is associated with a significant mean rating bump (`r round(t_pre_vs_host$estimate, 1)` points, t-test: p = `r round(t_pre_vs_host$p.value, 3)`; Wilcoxon: p = `r round(w_pre_vs_host$p.value, 3)`), while the mean post-host decline (`r round(t_host_vs_post$estimate, 1)` points) is not statistically significant (t-test: p = `r  round(t_host_vs_post$p.value, 3)`; Wilcoxon: p = `r round(w_host_vs_post$p.value, 3)`) (see @tbl-host-effect-tests).
+
+```{r tbl-host-effect-tests, echo=FALSE, warning=FALSE}
+
+ttest_table <- bind_rows(
+  tidy(t_pre_vs_host)  %>% mutate(comparison = "Host year vs. pre-host (3yr avg)", test = "Paired t-test"),
+  tidy(t_host_vs_post) %>% mutate(comparison = "Post-host (1yr) vs. host year",     test = "Paired t-test")
+) %>%
+  select(comparison, estimate, statistic, conf.low, conf.high, p.value) %>%
+  gt() %>%
+  tab_header(title = "(a) Paired t-test results") %>%
+  cols_label(
+    comparison = "Comparison",
+    estimate  = "Mean Diff.",
+    statistic = "t",
+    conf.low     = "95% CI (low)",
+    conf.high    = "95% CI (high)",
+    p.value    = "p-value",
+  ) %>%
+  fmt_number(
+    columns = c(estimate, statistic, conf.low, conf.high),
+    decimals = 2
+  ) %>%
+  fmt(
+    columns = p.value,
+    fns = function(x) ifelse(x < 0.001, "<0.001", formatC(x, digits = 3, format = "f"))
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(columns = p.value, rows = p.value < 0.05)
+  ) %>%
+  opt_row_striping() %>%
+  tab_options(
+    heading.title.font.size = 15,
+    heading.subtitle.font.size = 11,
+    table.font.size = 12,
+    column_labels.font.weight = "bold"
+  )
+
+wilcoxon_table <- tibble(
+  comparison = c("Host year vs. pre-host (3yr avg)", "Post-host (1yr) vs. host year"),
+  test = "Wilcoxon signed-rank",
+  V_stat = c(w_pre_vs_host$statistic, w_host_vs_post$statistic),
+  p.value = c(w_pre_vs_host$p.value, w_host_vs_post$p.value)
+) %>%
+  select(comparison, V_stat, p.value) %>%
+  gt() %>%
+  tab_header(title = "(b) Wilcoxon signed-rank test results") %>%
+  cols_label(
+    comparison = "Comparison",
+    V_stat = 'V',
+    p.value = "p-value"
+  ) %>%
+  fmt_number(columns = V_stat, decimals = 0) %>%
+  fmt(
+    columns = p.value,
+    fns = function(x) ifelse(x < 0.001, "<0.001", formatC(x, digits = 3, format = "f"))
+  ) %>%
+  tab_style(
+    style = cell_text(weight = "bold"),
+    locations = cells_body(columns = p.value, rows = p.value < 0.05)
+  ) %>%
+  opt_row_striping() %>%
+  tab_options(
+    heading.title.font.size = 15,
+    heading.subtitle.font.size = 11,
+    table.font.size = 12,
+    column_labels.font.weight = "bold"
+  )
+
+ttest_table
+wilcoxon_table
+```
+
+
+## Elo trajectory: debutant/returning teams vs traditional qualifiers
+
+This section evaluates the Elo rating trajectory between `debutants`, `Returners`, `traditional power`, and `occasional qualifier`. Additional data source containing World Cup qualifier history was used in this analysis, which is available on [Wikipedia](https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_qualification). 
+
+The teams are grouped as follows:
+
+  - **Debutants** (first qualified in 2026): Cape Verde, Curacao, Jordan, and Uzbekistan
+  - **Returners** (second-ever appearance, after a long gap since their first): Haiti, DR Congo, Iraq, Panama, Bosnia and Herzegovina
+  - **Traditional power** (10+ total qualifications, at least 2 consecutive recnet appearances): Brazil, Germany, Argentina, Mexico, England, France, Spain, Uruguay, Belgium, Switzerland, Netherlands, South Korea, United States
+  - **Occasional qualifier**: all remaining teams not meeting the criteria above
+
+```{r qualifier-groups, echo=FALSE, message=FALSE}
+
+# Groups:
+#   (Source: https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_qualification)
+# - Debutants (first qualified in 2026): Cape Verde, Curacao, Jordan,
+#     and Uzbekistan
+# - Returners: total time qualified = 2 & current consecutive appearances = 1
+#     [Haiti, DR Congo, Iraq, Panama, Bosnia and Herzegovina]
+# - Traditional power: total time qualified >= 10 & current consecutive
+#     appearances >= 2
+#     [Brazil, Germany, Argentina, Mexico, England, France, Spain, Uruguay,
+#      Belgium, Switzerland, Netherlands, South Korea, United States]
+# - Occasional qualifier: everything else
+
+qualifiers <- read_csv(here("data", "wc2026_qualifier_history.csv"))
+
+d.full <- d.full %>%
+  left_join(qualifiers %>% select(country, qualifier_category), by = "country")
+
+elo_by_group <- d.full %>%
+  filter(!is.na(qualifier_category)) %>%
+  group_by(qualifier_category, year) %>%
+  summarise(avg_rating = mean(rating, na.rm = TRUE), .groups = "drop")
+
+group_labels <- c(
+  debutant           = "Debutant",
+  long_gap_returner  = "Long-gap returner",
+  occasional         = "Occasional qualifier",
+  traditional        = "Traditional power"
+)
+
+group_colors <- c(
+  debutant           = "#2a78d6",
+  long_gap_returner  = "#eb6834",
+  occasional         = "#1baf7a",
+  traditional        = "#6250d6"
+)
+
+elo_by_group <- d.full %>%
+  filter(!is.na(qualifier_category)) %>%
+  group_by(qualifier_category, year) %>%
+  summarise(avg_rating = mean(rating, na.rm = TRUE), .groups = "drop") %>%
+  mutate(group_label = group_labels[qualifier_category])
+
+plot_ly(elo_by_group, x = ~year, y = ~avg_rating,
+        color = ~group_label,
+        colors = setNames(group_colors, group_labels[names(group_colors)]),
+        type = "scatter", mode = "lines",
+        line = list(width = 2),
+        hovertemplate = paste0(
+          "%{fullData.name}<br>Year: %{x}<br>Avg rating: %{y:.1f}<extra></extra>"
+        )) %>%
+  layout(
+    title = list(text = paste0("Average Elo rating by qualifier group, ",
+                                min(d.full$year), "-", year_max),
+                 y = 0.98),
+    xaxis = list(title = "Year",
+                 range = c(min(d.full$year), year_max)),
+    yaxis = list(title = "Average Elo rating"),
+    legend = list(orientation = "h", x = 0.5, y = 1.08, xanchor = "center"),
+    margin = list(t = 90),
+    autosize = TRUE
+  )
+```
+

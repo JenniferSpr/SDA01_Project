@@ -1,13 +1,41 @@
 ---
-title: "Title"
+title: "The Evolution of Global Football Power"
 subtitle: "SDA01"
-output: html_document
+author: "Jennifer Spieser, Qiu Xu, Hsiang-Chi Wang"
+date: "`r Sys.Date()`"
 runtime: shiny
+output:
+  html_document:
+    toc: true
+    toc-depth: 3
+    toc_float: true
+    number_sections: true
+    code_folding: hide
 ---
 
 # Introduction
 
-...
+Football's global balance of power is constantly shifting: new generations emerge, football cultures develop, and confederations rise or fade in strength. Yet this evolution is easy to miss when teams are judged only by tournament results, which capture a single moment rather than a long run trend. Elo ratings offer a way to track that evolution directly. Unlike official rankings, they update continuously based on match outcomes, opponent quality, and game significance, giving a dynamic, historically comparable measure of team strength.
+
+This project uses over a century of historical Elo ratings for national football teams to explore how global football power has shifted across countries, confederations, and time, using the 2026 FIFA World Cup as a focal point. Rather than treating the tournament as an isolated event, we situate it within each team's long run trajectory, asking whether traditional powers still dominate, whether confederation strength is converging, and how debutant or returning nations compare to established qualifiers.
+
+# Data Source
+
+The dataset used in this project, "2026 FIFA World Cup — Historical Elo Ratings," is publicly available on [Kaggle](https://www.kaggle.com/datasets/afonsofernandescruz/2026-fifa-world-cup-historical-elo-ratings).
+
+The dataset compiles pre-tournament Elo ratings and complete historical career data for all **48 teams qualified for the 2026 FIFA World Cup**. Coverage spans 1901 to 2026, 125 years of international football history. Several of the 48 qualifiers exist today under a different name or political entity than they did historically. Where FIFA officially recognizes a successor relationship, the dataset folds the predecessor's rows into the modern team, so each of the 48 teams reflects one continuous time series spanning the longest history recognized by FIFA.
+
+The data is structured as follows:
+
+- One row per **team** & **year-end** snapshot
+- Plus one live snapshot row per team at the file's creation date (snapshot date $\neq$ Dec 31), so there is always an as-of-today reading alongside by the year-end series
+
+For this project, the raw file (`elo_ratings_wc2026.csv`) contains **4,635 rows and 24 variables**, covering:
+
+- **Identification/time:** `year`, `snapshot_date`, `country`, `country_code`, `confederation`
+- **Rating/ranking:** `rating`, `rank`, plus all-time max/min/avg for each country (`rating_max`, `rank_max`, `rating_min`, `rank_min`, `rating_avg`, `rank_avg`)
+- **Match record:** cumulative counts of `matches_total/home/away/neutral`, `wins`, `losses`, `draws`, `goals_for`, `goals_against` as of the snapshot date
+- **World Cup context:** `is_host`, `wc2026_exit_round`
 
 # Data Preparation
 
@@ -60,7 +88,17 @@ write.csv(d.wc, "data/wc_elo_ratings.csv", row.names = FALSE)
 write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
 ```
 
-.....
+# Global Overview of Elo Rating
+
+```{r wc_overview, child="scripts/world_cup_descriptive.Rmd"}
+
+```
+
+# Qualifier Clustering by Elo Rating Trajectory
+
+```{r wc_cluster, child="scripts/world_cup_clustering.Rmd"}
+
+```
 
 # World Cup Simulation
 

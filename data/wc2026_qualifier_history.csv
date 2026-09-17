@@ -1,0 +1,49 @@
+country,confederation,total_times_qualified,last_time_qualified,current_consecutive_appearances,qualifier_category
+Brazil,CONMEBOL,23,2022.0,23,traditional
+Germany,UEFA,21,2022.0,19,traditional
+Argentina,CONMEBOL,19,2022.0,14,traditional
+Mexico,CONCACAF,18,2022.0,9,traditional
+England,UEFA,17,2022.0,8,traditional
+France,UEFA,17,2022.0,8,traditional
+Spain,UEFA,17,2022.0,13,traditional
+Uruguay,CONMEBOL,15,2022.0,5,traditional
+Belgium,UEFA,15,2022.0,4,traditional
+Switzerland,UEFA,13,2022.0,6,traditional
+Netherlands,UEFA,12,2022.0,2,traditional
+South Korea,AFC,12,2022.0,11,traditional
+Portugal,UEFA,9,2022.0,7,occasional
+Japan,AFC,8,2022.0,8,occasional
+Australia,AFC,7,2022.0,6,occasional
+Saudi Arabia,AFC,7,2022.0,3,occasional
+Iran,AFC,7,2022.0,4,occasional
+Tunisia,CAF,7,2022.0,3,occasional
+Morocco,CAF,7,2022.0,3,occasional
+Croatia,UEFA,7,2022.0,4,occasional
+Canada,CONCACAF,3,2022.0,2,occasional
+United States,CONCACAF,12,2022.0,2,traditional
+Sweden,UEFA,13,2018.0,1,occasional
+Scotland,UEFA,10,1998.0,1,occasional
+Austria,UEFA,9,1998.0,1,occasional
+Paraguay,CONMEBOL,9,2010.0,1,occasional
+Colombia,CONMEBOL,7,2018.0,1,occasional
+Czechia,UEFA,10,2006.0,1,occasional
+Turkey,UEFA,4,2002.0,1,occasional
+Egypt,CAF,4,2018.0,1,occasional
+Norway,UEFA,4,1998.0,1,occasional
+South Africa,CAF,4,2010.0,1,occasional
+Ivory Coast,CAF,4,2014.0,1,occasional
+Algeria,CAF,5,2014.0,1,occasional
+Ghana,CAF,5,2022.0,2,occasional
+Senegal,CAF,4,2022.0,3,occasional
+Ecuador,CONMEBOL,5,2022.0,2,occasional
+New Zealand,OFC,3,2010.0,1,occasional
+Qatar,AFC,2,2022.0,2,occasional
+Haiti,CONCACAF,2,1974.0,1,long_gap_returner
+DR Congo,CAF,2,1974.0,1,long_gap_returner
+Iraq,AFC,2,1986.0,1,long_gap_returner
+Panama,CONCACAF,2,2018.0,1,long_gap_returner
+Bosnia and Herzegovina,UEFA,2,2014.0,1,long_gap_returner
+Cape Verde,CAF,1,,1,debutant
+Curaçao,CONCACAF,1,,1,debutant
+Jordan,AFC,1,,1,debutant
+Uzbekistan,AFC,1,,1,debutant
