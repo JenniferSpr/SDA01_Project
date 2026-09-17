@@ -1,8 +1,14 @@
 ---
 title: "The Evolution of Global Football Power"
 subtitle: "SDA01"
+<<<<<<< HEAD
 author: "Jennifer Spieser, Qiu Xu, Hsiang-Chi Wang"
 date: "`r Sys.Date()`"
+=======
+output: 
+  html_document:
+    code_folding: hide
+>>>>>>> 1a5a3ebc0b13a520eaeaa29a6c89a134a3848f3f
 runtime: shiny
 output:
   html_document:
@@ -15,6 +21,7 @@ output:
 
 # Introduction
 
+<<<<<<< HEAD
 Football's global balance of power is constantly shifting: new generations emerge, football cultures develop, and confederations rise or fade in strength. Yet this evolution is easy to miss when teams are judged only by tournament results, which capture a single moment rather than a long run trend. Elo ratings offer a way to track that evolution directly. Unlike official rankings, they update continuously based on match outcomes, opponent quality, and game significance, giving a dynamic, historically comparable measure of team strength.
 
 This project uses over a century of historical Elo ratings for national football teams to explore how global football power has shifted across countries, confederations, and time, using the 2026 FIFA World Cup as a focal point. Rather than treating the tournament as an isolated event, we situate it within each team's long run trajectory, asking whether traditional powers still dominate, whether confederation strength is converging, and how debutant or returning nations compare to established qualifiers.
@@ -37,6 +44,8 @@ For this project, the raw file (`elo_ratings_wc2026.csv`) contains **4,635 rows 
 - **Match record:** cumulative counts of `matches_total/home/away/neutral`, `wins`, `losses`, `draws`, `goals_for`, `goals_against` as of the snapshot date
 - **World Cup context:** `is_host`, `wc2026_exit_round`
 
+=======
+>>>>>>> 1a5a3ebc0b13a520eaeaa29a6c89a134a3848f3f
 # Data Preparation
 
 Before starting the analysis, the data was assessed for consistency and integrity. It contains no missing or improbable values. The only NAs (in `wc2026_exit_round`) are expected, since not every country qualified for the tournament. The match counts add up correctly, and the dates fall within the expected range (1901–2026). Duplicate 2026 snapshots were split off into a separate World Cup dataset, leaving one snapshot per country per year.
@@ -97,6 +106,12 @@ write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
 # Qualifier Clustering by Elo Rating Trajectory
 
 ```{r wc_cluster, child="scripts/world_cup_clustering.Rmd"}
+
+```
+
+# World Cup Prediction
+
+```{r wc_prediction, child="scripts/prediction.Rmd"}
 
 ```
 

@@ -1,0 +1,570 @@
+---
+title: "world_cup_simulation"
+output: 
+  html_document
+runtime: shiny
+---
+
+# Data Preparation
+
+```{r cleaning, eval=FALSE}
+# Library
+library(here)
+
+# Load data
+d.raw <- read.csv(here("data", "elo_ratings_wc2026.csv"))
+
+# Check the dimensions
+dim(d.raw)
+
+# Convert snapshot_date to Date format
+d.raw$snapshot_date <- as.Date(d.raw$snapshot_date)
+class(d.raw$snapshot_date)
+
+# Missing values 
+colSums(is.na(d.raw))
+
+# Duplicate values
+sum(duplicated(d.raw))
+sum(duplicated(d.raw[c("year", "country")]))
+
+# Display duplicated country-year observations
+d.raw[duplicated(d.raw[c("year", "country")]) | duplicated(d.raw[c("year", "country")], fromLast = TRUE),
+  c("year", "country", "snapshot_date")]
+
+# Date range
+range(d.raw$year)                      
+range(d.raw$snapshot_date) 
+
+# Check number of matches and goals
+all(d.raw$matches_total == d.raw$matches_home + d.raw$matches_away + d.raw$matches_neutral)
+all(d.raw$matches_total == d.raw$wins + d.raw$losses + d.raw$draws)
+
+# Extract midyear snapshot date
+d.wc <- d.raw[d.raw$year == 2026 & d.raw$snapshot_date == as.Date("2026-07-07"),]
+
+# Remove the July 2026 snapshot from the main dataset
+d.full <- d.raw[!(d.raw$year == 2026 & d.raw$snapshot_date == as.Date("2026-07-07")),]
+
+# Check the duplicate values again
+sum(duplicated(d.full[c("year", "country")])) 
+
+# Save into new datasets
+write.csv(d.wc, "data/wc_elo_ratings.csv", row.names = FALSE)
+write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
+```
+
+
+## Prediction
+
+**1. Prepare the 2026 prediction dataset**
+
+```{r cache=True, echo=False}
+# Load required packages
+library(tidyverse)
+library(here)
+library(lubridate)
+library(ranger)
+library(yardstick)
+library(rsample)
+library(ggrepel)
+
+# Extract the pre-tournament snapshot
+# Chose2025-12-31 as the last annual snapshot before the start of the 2026 World Cup
+d.pre2026 <- d.full |>
+  filter(
+    year == 2025,
+    snapshot_date == as.Date("2025-12-31") 
+  ) 
+
+# Extract the 2026 tournament outcomes
+d.outcome2026 <- d.wc |>
+  select(
+    country,
+    wc2026_exit_round
+  )
+
+# Combine pre-tournament team information from 2025 with the observed 2026 World Cup outcome.
+# ・Predictors = information available before the 2026 World Cup
+# ・Outcome = actual 2026 World Cup result
+d.predict2026 <- d.pre2026 |>
+  select(
+    country,
+    rating,
+    rank,
+    rating_max,
+    wins,
+    matches_total,
+    is_host,
+    confederation
+  ) |>
+  left_join(
+    d.outcome2026,
+    by = "country"
+  )
+
+# Check that all 48 teams are included
+nrow(d.predict2026)
+
+# Check for unmatched teams
+sum(is.na(d.predict2026$wc2026_exit_round))
+```
+
+The resulting dataset contains 48 teams, corresponding to the 48 teams participating in the 2026 World Cup. No teams have missing tournament outcomes after the join, confirming that all 48 teams were successfully matched with their observed 2026 results.
+
+**2. Define the prediction outcome**
+
+```{r cache=True, echo=False}
+# ・advanced = 1 indicates that a team reached at least the Round of 16
+# ・advanced = 0 indicates elimination in the group stage or Round of 32
+d.predict2026 <- d.predict2026 |>
+  mutate(
+    advanced = if_else(
+      wc2026_exit_round %in% c("R16", "active"), 
+      1,
+      0
+    )
+  )
+
+# Outcome distribution
+table(d.predict2026$advanced)
+
+```
+
+The outcome distribution contains 32 teams classified as not advancing (advanced = 0) and 16 teams classified as advancing to at least the Round of 16 (advanced = 1). Thus, one third of the teams in the dataset reached the Round of 16 or beyond.
+
+The prediction problem under investigation is therefore formulated as follows: To what extent can pre-tournament team characteristics distinguish between teams that progress to at least the Round of 16 and those eliminated in the earlier stages of the tournament?
+
+**3. Feature engineering**
+
+```{r cache=True, echo=False}
+# create two new variables:
+# ・rating_gap: measures how far a team's current Elo rating is below its historical maximum Elo rating. 
+# 　A larger value therefore indicates a larger distance from the team's historical peak.
+# ・win_rate: represents the proportion of recorded matches that the team has won.
+
+d.predict2026 <- d.predict2026 |>
+  mutate(
+    rating_gap = rating_max - rating,
+    win_rate = wins / matches_total,
+    is_host = factor(is_host),
+    confederation = factor(confederation)
+  ) # Convert into factors, to make them easier to use in the statistical models that follow
+
+d.predict2026
+```
+
+The resulting dataset contains the original team-level predictors together with the newly created "rating_gap" and "win_rate" variables. "is_host" and "confederation" have also been converted to factors for use in the statistical models.
+
+**4. Select predictors**
+
+```{r cache=True, echo=False}
+# Use a correlation matrix to check the correlations between the variables.
+d.predict2026 |>
+  select(
+    rating,
+    rank,
+    rating_gap,
+    win_rate
+  ) |>
+  cor(use = "complete.obs")
+```
+
+The correlation matrix shows a very strong negative correlation between "rating" and "rank" (r = -0.971). This indicates substantial redundancy between the two predictors and raises a clear concern about multicollinearity. Therefore, "rank" was excluded, while "rating" was retained in the model.
+
+The correlations among the remaining predictors are considerably weaker. Therefore, "rating_gap" and "win_rate" were retained as additional predictors.
+
+**5. Fit the GLM Model**
+
+```{r cache=True, echo=False}
+# Fit a simplified logistic regression model
+glm_model <- glm(
+  advanced ~ rating + rating_gap + win_rate,
+  data = d.predict2026,
+  family = binomial
+  # Because advanced only takes: 0 = did not make the Round of 16; 1 = made the Round of 16
+  # So use:Logistic Regression / Binomial GLM
+)
+
+# Display the model results
+summary(glm_model)
+```
+
+***GLM Model Interpretation***
+・Elo rating is the only statistically significant predictor of reaching at least the Round of 16 (β = 0.010669, p = 0.00173). Higher Elo ratings are associated with higher odds of advancing, holding the other predictors constant.\
+・Rating gap (p = 0.77470) and win rate (p = 0.70809) are not statistically significant predictors in this model.\
+・The residual deviance (42.688) is lower than the null deviance (61.105), indicating that the model with predictors fits the observed outcomes better than an intercept-only model.\
+・The AIC is 50.688, which can be used to compare alternative models fitted to the same data; lower values generally indicate a better fit–complexity trade-off.\
+・The model converged normally after five Fisher scoring iterations, with no convergence warning reported.\
+
+```{r}
+# Calculate odds ratios
+glm_results <- tibble(
+  Predictor = names(coef(glm_model))[-1],
+  Odds_Ratio = exp(coef(glm_model)[-1]),
+  P_Value = summary(glm_model)$coefficients[-1, "Pr(>|z|)"]
+)
+
+glm_results
+```
+
+The odds ratios provide an interpretation of the estimated effects of the predictors on the likelihood of reaching at least the Round of 16.\
+・Rating: OR = 1.0107. A one-point increase in Elo rating is associated with approximately a 1.07% increase in the odds of reaching at least the Round of 16, holding the other predictors constant. This association is statistically significant (p = 0.0017).\
+・Rating gap: OR = 1.0012. The estimated effect is very small, and the association is not statistically significant (p = 0.775). Therefore, the rating gap does not provide clear evidence of an additional association with reaching the Round of 16 in this model.\
+・Win rate: OR = 0.1213. The model estimates lower estimated odds of reaching the Round of 16 at higher values of win rate. However, this association is not statistically significant (p = 0.708), so the estimated negative direction should not be interpreted as evidence of a meaningful relationship.\
+
+**6. Fit a Random Forest model**
+
+```{r cache=True, echo=False}
+# Store out-of-fold predictions
+cv.results <- tibble(
+  country = d.predict2026$country,
+  actual = d.predict2026$advanced,
+  glm_probability = NA_real_,
+  rf_probability = NA_real_
+)
+
+# Check that each country appears only once
+stopifnot(!anyDuplicated(cv.results$country))
+
+# Create stratified 5-fold cross-validation splits.
+# Stratification keeps the proportion of advanced = 0 and advanced = 1
+# as similar as possible across the five folds.
+set.seed(123)
+
+cv_folds <- vfold_cv(
+  d.predict2026,
+  v = 5,
+  strata = advanced
+)
+
+# 5-fold cross-validation
+for (fold in 1:5) {
+
+  # Extract the training and assessment data for the current fold.
+  train_data <- analysis(cv_folds$splits[[fold]])
+  test_data <- assessment(cv_folds$splits[[fold]])
+
+  # GLM
+  cv_glm <- glm(
+    advanced ~ rating + rating_gap + win_rate,
+    data = train_data,
+    family = binomial
+  )
+
+  # Random Forest
+  train_data_rf <- train_data |>
+    mutate(
+      advanced = factor(advanced, levels = c(0, 1))
+    )
+
+  cv_rf <- ranger(
+    advanced ~ rating + rating_gap + win_rate,
+    data = train_data_rf,
+    num.trees = 500,
+    probability = TRUE,
+    seed = 123
+  )
+
+  # Store GLM probabilities for the held-out teams.
+  cv.results$glm_probability[
+    match(test_data$country, cv.results$country)
+  ] <-
+    predict(
+      cv_glm,
+      newdata = test_data,
+      type = "response"
+    )
+
+  # Store Random Forest probabilities for class 1 (advanced).
+  cv.results$rf_probability[
+    match(test_data$country, cv.results$country)
+  ] <-
+    predict(
+      cv_rf,
+      data = test_data
+    )$predictions[, "1"]
+}
+
+# Display cross-validated predictions
+cv.results
+```
+
+The table shows the out-of-fold predicted probabilities for each team. The GLM and Random Forest probabilities are generated from models trained without the respective team's observation, allowing their predictive performance to be compared using cross-validation.
+
+**7. Compare GLM and Random Forest**
+
+```{r cache=True, echo=False}
+# Calculate classification accuracy
+glm_accuracy <- mean(
+  if_else(
+    cv.results$glm_probability >= 0.5,
+    1,
+    0
+  ) == cv.results$actual
+)
+
+rf_accuracy <- mean(
+  if_else(
+    cv.results$rf_probability >= 0.5,
+    1,
+    0
+  ) == cv.results$actual
+)
+
+# Calculate Brier scores
+glm_brier <- mean(
+  (cv.results$actual - cv.results$glm_probability)^2
+)
+
+rf_brier <- mean(
+  (cv.results$actual - cv.results$rf_probability)^2
+)
+
+# Model comparison
+cv.comparison <- tibble(
+  Model = c(
+    "Logistic Regression",
+    "Random Forest"
+  ),
+  Accuracy = c(
+    glm_accuracy,
+    rf_accuracy
+  ),
+  Brier_Score = c(
+    glm_brier,
+    rf_brier
+  )
+)
+
+cv.comparison
+```
+
+***GLM****
+The GLM achieved 70.8% cross-validated accuracy, meaning that it correctly classified about 71% of the teams in the held-out folds. Its Brier Score was 0.180, indicating relatively good probabilistic performance, with lower values representing better-calibrated predictions.Overall, the GLM shows reasonable predictive performance despite the small sample size of only 48 teams.
+
+***Random Forest***
+The Random Forest also achieved 70.8% cross-validated accuracy, which is identical to the GLM. However, its Brier Score was 0.202, which was higher than the GLM's 0.180. This indicates that, although both models achieved the same classification accuracy at the 0.5 threshold, the GLM produced somewhat better probability estimates across the held-out observations.
+
+***Main conclusion***
+In the 5-fold cross-validation, the GLM and Random Forest achieved the same classification accuracy of 70.8%. However, the GLM achieved a lower Brier Score (0.180 vs. 0.202), indicating better probabilistic performance.
+
+The Random Forest did not improve classification accuracy and had a higher Brier Score than the GLM, indicating weaker probabilistic performance in this cross-validation comparison.
+
+The cross-validated results provide a more informative assessment of out-of-sample performance than evaluating predictions on the same observations used for model fitting. Since both models were evaluated on the same held-out folds, the comparison provides a consistent basis for assessing their predictive performance.
+
+**8. Generate final GLM probabilities for the 48 teams**
+
+```{r cache=True, echo=False}
+d.predict2026 <- d.predict2026 |>
+  mutate(
+    glm_probability = predict(
+      glm_model,
+      type = "response"
+    )
+  )
+
+d.predict2026 |>
+  select(
+    country,
+    rating,
+    glm_probability,
+    advanced
+  ) |>
+  arrange(desc(glm_probability))
+```
+
+The final GLM was fitted using all 48 teams and the pre-tournament predictors. The resulting probabilities represent the model's estimated probability that each team would reach at least the Round of 16. The teams are ordered from highest to lowest predicted probability. For example, Spain received the highest predicted probability (93.5%), followed by Argentina (89.8%) and France (85.1%).
+
+**9. Visualize predicted probabilities**
+
+```{r cache=True, echo=False}
+# Prepare data for the probability plot
+plot_data <- d.predict2026 |>
+  arrange(glm_probability) |>
+  mutate(
+    position = row_number(),
+    actual_result = factor(
+      advanced,
+      levels = c(0, 1),
+      labels = c("Did not advance", "Advanced")
+    ),
+    prediction_error = if_else(
+      (glm_probability >= 0.5 & advanced == 0) |
+      (glm_probability < 0.5 & advanced == 1),
+      "Error",
+      "Correct"
+    )
+  )
+```
+
+```{r}
+# Visualize predicted probabilities
+ggplot(
+  plot_data,
+  aes(
+    x = glm_probability,
+    y = position
+  )
+) +
+  geom_point(
+    aes(
+      fill = actual_result
+    ),
+    shape = 21,
+    size = 4,
+    color = "white"
+  ) +
+  geom_vline(
+    xintercept = 0.5,
+    linetype = "dashed"
+  ) +
+  geom_text(
+    data = filter(plot_data, prediction_error == "Error"),
+    aes(label = country),
+    nudge_y = 0.5,
+    size = 3
+  ) +
+  scale_x_continuous(
+    limits = c(0, 1),
+    labels = scales::percent
+  ) +
+  scale_y_continuous(
+    breaks = NULL
+  ) +
+  labs(
+    title = "Predicted Probability of Reaching the Round of 16",
+    subtitle = "Labels show teams incorrectly classified by the GLM",
+    x = "Predicted probability",
+    y = NULL,
+    fill = "Actual outcome"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    panel.grid.major.y = element_blank()
+  )
+```
+
+The plot shows the GLM's predicted probability of reaching the Round of 16 for each of the 48 teams. The dashed vertical line at 50% represents the classification threshold: teams with predicted probabilities of at least 50% are classified as expected to advance, while those below 50% are classified as expected not to advance.
+
+Overall, the model separates the two outcome groups reasonably well. Most teams that did not advance (pink points) have predicted probabilities below 50%, while most teams that advanced (blue points) have probabilities above 50%. The probabilities also vary substantially across teams, ranging from very low values for some non-advancing teams to above 90% for the highest-rated teams.
+
+The plot also highlights several misclassified teams, whose country names are labelled. On the right side of the 50% threshold, teams such as Ecuador, Netherlands, Germany, Croatia, and Uruguay were assigned probabilities above 50% but did not actually advance. These are ***false positives***. Conversely, teams such as Brazil, Belgium, Morocco, Mexico, Paraguay, Canada, and the United States advanced despite receiving probabilities below 50%, representing ***false negatives***.
+
+This illustrates that although the GLM captures a clear relationship between the pre-tournament predictors and tournament progression, the predictions are not perfect. In particular, teams with probabilities close to the 50% threshold are relatively uncertain cases, while the model is more confident about teams at the extreme ends of the probability range.
+
+**10. Examine cross-validated prediction errors**
+
+```{r cache=True, echo=False}
+cv.results <- cv.results |>
+  mutate(
+    glm_prediction = if_else(
+      glm_probability >= 0.5,
+      1,
+      0
+    )
+  )
+
+cv.results |>
+  filter(
+    glm_prediction != actual
+  ) |>
+  select(
+    country,
+    actual,
+    glm_probability,
+    glm_prediction
+  ) |>
+  arrange(desc(glm_probability))
+```
+
+The cross-validated errors show that the logistic regression model made both false-positive and false-negative predictions. Some teams, such as Ecuador, Germany and the Netherlands, were assigned relatively high probabilities of reaching the Round of 16 but did not actually advance. In contrast, Brazil, Belgium, Mexico and Morocco advanced despite receiving predicted probabilities below 0.5. This suggests that pre-tournament team strength alone cannot fully capture the uncertainty of a short tournament.
+
+The errors also help explain the model's higher specificity than sensitivity: the model was better at identifying teams that did not advance than teams that actually advanced.
+
+**11. Final performance metrics**
+
+```{r cache=True, echo=False}
+conf_matrix <- table(
+  Prediction = cv.results$glm_prediction,
+  Actual = cv.results$actual
+)
+```
+
+```{r}
+# Confusion matrix heatmap
+conf.plot <- as.data.frame(conf_matrix)
+
+ggplot(
+  conf.plot,
+  aes(
+    x = Actual,
+    y = Prediction,
+    fill = Freq
+  )
+) +
+  geom_tile() +
+  geom_text(
+    aes(label = Freq),
+    size = 5
+  ) +
+  labs(
+    title = "Cross-Validated GLM Confusion Matrix",
+    x = "Actual outcome",
+    y = "Predicted outcome",
+    fill = "Number of teams"
+  ) +
+  theme_minimal()
+```
+
+The confusion matrix shows the classification results of the cross-validated GLM at a 0.5 probability threshold. Of the 32 teams that did not advance to the Round of 16, 26 were correctly classified, while 6 were incorrectly classified as advancing. Among the 16 teams that actually advanced, 8 were correctly identified and 8 were incorrectly classified as not advancing. Thus, the model produced 34 correct classifications and 14 mis-classifications out of 48 teams.
+
+```{r cache=True, echo=False}
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+sensitivity <- conf_matrix["1", "1"] /
+  sum(conf_matrix[, "1"])
+
+specificity <- conf_matrix["0", "0"] /
+  sum(conf_matrix[, "0"])
+
+final_metrics <- tibble(
+  Metric = c(
+    "Accuracy",
+    "Sensitivity",
+    "Specificity",
+    "Brier Score"
+  ),
+  Value = c(
+    accuracy,
+    sensitivity,
+    specificity,
+    glm_brier
+  )
+)
+
+final_metrics
+```
+
+The cross-validated GLM achieved an overall accuracy of 70.8%, correctly classifying 34 of the 48 teams using a 0.5 probability threshold. The sensitivity was 50.0%, indicating that the model correctly identified 8 of the 16 teams that actually advanced to the Round of 16. The specificity was 81.3%, indicating that the model correctly identified 26 of the 32 teams that did not advance. This shows that the model identified non-advancing teams more frequently than advancing teams.
+
+The Brier Score was 0.1804, providing an assessment of the predicted probabilities rather than only the final classifications. Lower Brier Scores indicate better probabilistic prediction performance.
+
+***Conclusion***
+
+The analysis shows that pre-tournament information can provide useful signals for distinguishing teams with a higher likelihood of advancing to at least the Round of 16. Among the predictors included in the logistic regression, Elo rating was the only statistically significant predictor.
+
+The cross-validated GLM achieved an accuracy of 70.8%, with a specificity of 81.3% and a sensitivity of 50.0%. Its Brier score was 0.1804. The Random Forest achieved the same classification accuracy but had a higher Brier score (0.2024), indicating weaker probabilistic performance in this cross-validation comparison. Based on these results, the GLM was selected as the preferred model.
+
+The prediction errors show that the model made both false-positive and false-negative predictions. For example, some teams that received relatively high predicted probabilities did not advance, while some teams with predicted probabilities below 0.5 nevertheless reached the Round of 16. This suggests that pre-tournament information provides useful signals for tournament progression, but cannot fully capture the uncertainty of a short tournament.
+
+***Limitations***
+
+Small sample size: The analysis contains only 48 teams participating in the 2026 World Cup.
+
+Retrospective setting: The 2026 outcomes are already observed in the dataset. Therefore, the analysis evaluates how well pre-tournament information distinguishes the observed outcomes rather than providing a genuine forecast of an unknown future tournament.
+
+Limited predictors: The model mainly uses Elo-based indicators and win rate and does not capture factors such as injuries, squad composition, tactics, group composition, or match-specific conditions.
+
+Tournament uncertainty: World Cup outcomes are subject to substantial uncertainty, meaning that even strong pre-tournament indicators cannot perfectly predict tournament progression.
