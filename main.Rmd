@@ -62,6 +62,12 @@ write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
 
 .....
 
+# World Cup Prediction
+
+```{r wc_prediction, child="scripts/prediction.Rmd"}
+
+```
+
 # World Cup Simulation
 
 ```{r wc_simulation, child="scripts/world_cup_simulation.Rmd"}
