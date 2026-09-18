@@ -5,57 +5,9 @@ output:
 runtime: shiny
 ---
 
-# Data Preparation
-
-```{r cleaning, eval=FALSE}
-# Library
-library(here)
-
-# Load data
-d.raw <- read.csv(here("data", "elo_ratings_wc2026.csv"))
-
-# Check the dimensions
-dim(d.raw)
-
-# Convert snapshot_date to Date format
-d.raw$snapshot_date <- as.Date(d.raw$snapshot_date)
-class(d.raw$snapshot_date)
-
-# Missing values 
-colSums(is.na(d.raw))
-
-# Duplicate values
-sum(duplicated(d.raw))
-sum(duplicated(d.raw[c("year", "country")]))
-
-# Display duplicated country-year observations
-d.raw[duplicated(d.raw[c("year", "country")]) | duplicated(d.raw[c("year", "country")], fromLast = TRUE),
-  c("year", "country", "snapshot_date")]
-
-# Date range
-range(d.raw$year)                      
-range(d.raw$snapshot_date) 
-
-# Check number of matches and goals
-all(d.raw$matches_total == d.raw$matches_home + d.raw$matches_away + d.raw$matches_neutral)
-all(d.raw$matches_total == d.raw$wins + d.raw$losses + d.raw$draws)
-
-# Extract midyear snapshot date
-d.wc <- d.raw[d.raw$year == 2026 & d.raw$snapshot_date == as.Date("2026-07-07"),]
-
-# Remove the July 2026 snapshot from the main dataset
-d.full <- d.raw[!(d.raw$year == 2026 & d.raw$snapshot_date == as.Date("2026-07-07")),]
-
-# Check the duplicate values again
-sum(duplicated(d.full[c("year", "country")])) 
-
-# Save into new datasets
-write.csv(d.wc, "data/wc_elo_ratings.csv", row.names = FALSE)
-write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
-```
-
-
 ## Prediction
+
+Building on the previous analyses, this section moves from describing and grouping team characteristics to testing their predictive value. We investigate whether pre-tournament information can help distinguish teams that progress to at least the Round of 16 in the 2026 World Cup. 
 
 **1. Prepare the 2026 prediction dataset**
 
@@ -114,13 +66,20 @@ The resulting dataset contains 48 teams, corresponding to the 48 teams participa
 
 **2. Define the prediction outcome**
 
+```{r}
+d.raw |>
+  filter(year == 2026) |>
+  count(snapshot_date)
+```
+
 ```{r cache=True, echo=False}
-# ・advanced = 1 indicates that a team reached at least the Round of 16
-# ・advanced = 0 indicates elimination in the group stage or Round of 32
+# advanced = 1 indicates that a team reached the Round of 16
+# advanced = 0 indicates elimination in the group stage or Round of 32
+
 d.predict2026 <- d.predict2026 |>
   mutate(
     advanced = if_else(
-      wc2026_exit_round %in% c("R16", "active"), 
+      wc2026_exit_round %in% c("R16", "active"),  # active:if still in, else the round eliminated
       1,
       0
     )
@@ -131,7 +90,7 @@ table(d.predict2026$advanced)
 
 ```
 
-The outcome distribution contains 32 teams classified as not advancing (advanced = 0) and 16 teams classified as advancing to at least the Round of 16 (advanced = 1). Thus, one third of the teams in the dataset reached the Round of 16 or beyond.
+The outcome distribution contains 32 teams classified as not advancing (advanced = 0) and 16 teams classified as advancing to at least the Round of 16 or remaining active at the 2026-07-07 snapshot (advanced = 1). Thus, one third of the teams had reached at least the Round of 16 or were still active at the time of the snapshot.
 
 The prediction problem under investigation is therefore formulated as follows: To what extent can pre-tournament team characteristics distinguish between teams that progress to at least the Round of 16 and those eliminated in the earlier stages of the tournament?
 
@@ -142,13 +101,15 @@ The prediction problem under investigation is therefore formulated as follows: T
 # ・rating_gap: measures how far a team's current Elo rating is below its historical maximum Elo rating. 
 # 　A larger value therefore indicates a larger distance from the team's historical peak.
 # ・win_rate: represents the proportion of recorded matches that the team has won.
+# ・is_host: 1 if the team is hosting the tournament (USA, Canada, Mexico), else 0.
+# ・confederation: UEFA / CONMEBOL / CONCACAF / CAF / AFC / OFC
 
 d.predict2026 <- d.predict2026 |>
   mutate(
     rating_gap = rating_max - rating,
     win_rate = wins / matches_total,
-    is_host = factor(is_host),
-    confederation = factor(confederation)
+    is_host = factor(is_host),  
+    confederation = factor(confederation) 
   ) # Convert into factors, to make them easier to use in the statistical models that follow
 
 d.predict2026
@@ -555,16 +516,6 @@ The Brier Score was 0.1804, providing an assessment of the predicted probabiliti
 
 The analysis shows that pre-tournament information can provide useful signals for distinguishing teams with a higher likelihood of advancing to at least the Round of 16. Among the predictors included in the logistic regression, Elo rating was the only statistically significant predictor.
 
-The cross-validated GLM achieved an accuracy of 70.8%, with a specificity of 81.3% and a sensitivity of 50.0%. Its Brier score was 0.1804. The Random Forest achieved the same classification accuracy but had a higher Brier score (0.2024), indicating weaker probabilistic performance in this cross-validation comparison. Based on these results, the GLM was selected as the preferred model.
+The cross-validated GLM achieved an accuracy of 70.8%, with a specificity of 81.3% and a sensitivity of 50.0%. Its Brier score was 0.1804. The Random Forest achieved the same classification accuracy but had a higher Brier score (0.2024), indicating weaker probabilistic performance in this cross-validation comparison. Given the same accuracy and lower Brier score, the GLM was used as the final model because it also provides more interpretable relationships between the predictors and the estimated probabilities.
 
-The prediction errors show that the model made both false-positive and false-negative predictions. For example, some teams that received relatively high predicted probabilities did not advance, while some teams with predicted probabilities below 0.5 nevertheless reached the Round of 16. This suggests that pre-tournament information provides useful signals for tournament progression, but cannot fully capture the uncertainty of a short tournament.
-
-***Limitations***
-
-Small sample size: The analysis contains only 48 teams participating in the 2026 World Cup.
-
-Retrospective setting: The 2026 outcomes are already observed in the dataset. Therefore, the analysis evaluates how well pre-tournament information distinguishes the observed outcomes rather than providing a genuine forecast of an unknown future tournament.
-
-Limited predictors: The model mainly uses Elo-based indicators and win rate and does not capture factors such as injuries, squad composition, tactics, group composition, or match-specific conditions.
-
-Tournament uncertainty: World Cup outcomes are subject to substantial uncertainty, meaning that even strong pre-tournament indicators cannot perfectly predict tournament progression.
+The prediction errors show that the model made both false-positive and false-negative predictions. Some teams received relatively high predicted probabilities but did not advance, while some teams with predicted probabilities below 0.5 nevertheless reached the Round of 16. This highlights the uncertainty inherent in tournament progression. The resulting probabilities therefore provide a useful starting point for the subsequent simulation of tournament outcomes.
