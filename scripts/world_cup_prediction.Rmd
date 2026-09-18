@@ -90,7 +90,7 @@ table(d.predict2026$advanced)
 
 ```
 
-The outcome distribution contains 32 teams classified as not advancing (advanced = 0) and 16 teams classified as advancing to at least the Round of 16 or remaining active at the 2026-07-07 snapshot (advanced = 1). Thus, one third of the teams had reached at least the Round of 16 or were still active at the time of the snapshot.
+The outcome distribution contains 32 teams classified as not advancing (advanced = 0) and 16 teams classified as advancing to at least the Round of 16 or remaining active at the 2026-07-07 snapshot (advanced = 1). Thus, one third of the teams had either reached the Round of 16 or were still active at the time of the 2026-07-07 snapshot.
 
 The prediction problem under investigation is therefore formulated as follows: To what extent can pre-tournament team characteristics distinguish between teams that progress to at least the Round of 16 and those eliminated in the earlier stages of the tournament?
 
@@ -137,6 +137,53 @@ The correlations among the remaining predictors are considerably weaker. Therefo
 
 **5. Fit the GLM Model**
 
+***Mathematical Formulation***
+
+The logistic regression model estimates the probability that a team advances to at least the Round of 16:
+
+$$
+P(Y_i = 1 \mid X_i)
+=
+\frac{1}{1+\exp(-\eta_i)}
+$$
+
+where
+
+$$
+\eta_i
+=
+\beta_0
++
+\beta_1 \text{rating}_i
++
+\beta_2 \text{rating\_gap}_i
++
+\beta_3 \text{win\_rate}_i.
+$$
+
+Equivalently, the model can be written in log-odds form as
+
+$$
+\log\left(
+\frac{P(Y_i=1\mid X_i)}
+{1-P(Y_i=1\mid X_i)}
+\right)
+=
+\beta_0
++
+\beta_1 \text{rating}_i
++
+\beta_2 \text{rating\_gap}_i
++
+\beta_3 \text{win\_rate}_i.
+$$
+Here, $Y_i=1$ indicates that team $i$ reached at least the Round of 16,
+while $Y_i=0$ indicates that the team was eliminated before the Round of 16.
+The predictors are the pre-tournament Elo rating, the gap between the
+team's historical maximum Elo rating and its current rating, and its historical win rate.
+
+***GLM Model***
+
 ```{r cache=True, echo=False}
 # Fit a simplified logistic regression model
 glm_model <- glm(
@@ -175,6 +222,36 @@ The odds ratios provide an interpretation of the estimated effects of the predic
 ・Win rate: OR = 0.1213. The model estimates lower estimated odds of reaching the Round of 16 at higher values of win rate. However, this association is not statistically significant (p = 0.708), so the estimated negative direction should not be interpreted as evidence of a meaningful relationship.\
 
 **6. Fit a Random Forest model**
+
+***Mathematical Formulation***
+
+For the Random Forest model, the predicted probability is obtained by averaging
+the predictions from $B$ individual decision trees:
+
+$$
+\hat{P}(Y_i=1\mid X_i)
+=
+\frac{1}{B}
+\sum_{b=1}^{B}
+\hat{P}_b(Y_i=1\mid X_i),
+$$
+
+where $B$ is the number of trees and
+$\hat{P}_b(Y_i=1\mid X_i)$ is the probability predicted by tree $b$.
+
+In this analysis, the Random Forest consists of $B=500$ trees.
+The final class probability is obtained by averaging the predicted
+probabilities across the individual trees:
+
+$$
+\hat{P}(Y_i=1\mid X_i)
+=
+\frac{1}{500}
+\sum_{b=1}^{500}
+\hat{P}_b(Y_i=1\mid X_i).
+$$
+
+***Random Forest Model***
 
 ```{r cache=True, echo=False}
 # Store out-of-fold predictions
@@ -335,7 +412,7 @@ d.predict2026 |>
   arrange(desc(glm_probability))
 ```
 
-The final GLM was fitted using all 48 teams and the pre-tournament predictors. The resulting probabilities represent the model's estimated probability that each team would reach at least the Round of 16. The teams are ordered from highest to lowest predicted probability. For example, Spain received the highest predicted probability (93.5%), followed by Argentina (89.8%) and France (85.1%).
+The GLM was fitted using all 48 teams and the pre-tournament predictors. The resulting fitted probabilities represent the model's estimated probability that each team would reach at least the Round of 16. The teams are ordered from highest to lowest predicted probability. For example, Spain received the highest predicted probability (93.5%), followed by Argentina (89.8%) and France (85.1%).
 
 **9. Visualize predicted probabilities**
 
@@ -518,4 +595,4 @@ The analysis shows that pre-tournament information can provide useful signals fo
 
 The cross-validated GLM achieved an accuracy of 70.8%, with a specificity of 81.3% and a sensitivity of 50.0%. Its Brier score was 0.1804. The Random Forest achieved the same classification accuracy but had a higher Brier score (0.2024), indicating weaker probabilistic performance in this cross-validation comparison. Given the same accuracy and lower Brier score, the GLM was used as the final model because it also provides more interpretable relationships between the predictors and the estimated probabilities.
 
-The prediction errors show that the model made both false-positive and false-negative predictions. Some teams received relatively high predicted probabilities but did not advance, while some teams with predicted probabilities below 0.5 nevertheless reached the Round of 16. This highlights the uncertainty inherent in tournament progression. The resulting probabilities therefore provide a useful starting point for the subsequent simulation of tournament outcomes.
+The prediction errors show that the model made both false-positive and false-negative predictions. Some teams received relatively high predicted probabilities but did not advance, while some teams with predicted probabilities below 0.5 nevertheless reached the Round of 16. This highlights the uncertainty inherent in tournament progression. The resulting fitted probabilities provide an additional summary of how the model assesses the 48 teams based on their pre-tournament characteristics.
