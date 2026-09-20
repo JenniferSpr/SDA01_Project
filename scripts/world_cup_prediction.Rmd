@@ -457,7 +457,7 @@ cv.results |>
   arrange(desc(glm_probability))
 ```
 
-The cross-validated errors show that the logistic regression model made both false-positive and false-negative predictions. Some teams, such as Ecuador, Germany, Croatia, the Netherlands and Uruguay, were assigned relatively high probabilities of reaching the Round of 16 but did not actually advance. In contrast, Brazil, Belgium, Mexico and Morocco advanced despite receiving predicted probabilities below 0.5. This suggests that pre-tournament team strength alone cannot fully capture the uncertainty of a short tournament.
+The cross-validated errors show that the logistic regression model made both false-positive and false-negative predictions. Some teams, such as Ecuador, Germany, Croatia, the Netherlands and Uruguay, were assigned relatively high probabilities of reaching the Round of 16 but did not actually advance. In contrast, Belgium, Mexico and Morocco advanced despite receiving predicted probabilities below 0.5. This suggests that pre-tournament team strength alone cannot fully capture the uncertainty of a short tournament.
 
 The errors also help explain the model's higher specificity than sensitivity: the model was better at identifying teams that did not advance than teams that actually advanced.
 
