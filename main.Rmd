@@ -116,6 +116,20 @@ write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
 
 # Conclusion
 
+This project used historical Elo ratings to examine how global football power has evolved and to place the 2026 FIFA World Cup within this broader context.
+
+The descriptive analysis showed that traditional football powers continue to occupy leading positions, particularly within UEFA and CONMEBOL, while several other confederations have shown signs of improvement over time.
+
+The clustering analysis further showed that qualified teams have followed different historical trajectories.
+
+The predictive analysis confirmed the importance of Elo rating, which was the only statistically significant predictor of reaching at least the Round of 16 in the logistic regression. However, the model also produced both false-positive and false-negative predictions, showing that pre-tournament characteristics cannot fully explain progression.
+
+The simulation reinforced this uncertainty. Although stronger teams generally had higher probabilities of progressing, team strength alone did not determine tournament outcomes. Group composition and tournament pathways also influenced advancement probabilities, and comparison with actual results revealed several outcomes that were relatively unlikely according to the simulations.
+
+However, out approach has several limitations. A football match depends on more than the difference between two Elo ratings. Player form, injuries, red cards, weather, travel and fatigue can all influence performance but are not captured by our models. In addition, modeling choices may influence results.
+
+Overall, the different analyses point to the same central conclusion : Elo rating provides a useful measure of football strength and a strong basis for understanding historical trajectories and estimating future performance, but football remains inherently uncertain.
+
 # Sources
 
 FootyStats. (n.d.). *2026 FIFA World Cup stats: xG, corners, and over 2.5 goals*. Retrieved September 20, 2026, from <https://footystats.org/world-cup>
