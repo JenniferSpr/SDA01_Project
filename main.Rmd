@@ -1,19 +1,17 @@
 ---
-title: "The Evolution of Global Football Power"
-subtitle: "SDA01"
-author: "Jennifer Spieser, Qiu Xu, Hsiang-Chi Wang"
-date: "`r Sys.Date()`"
-
 runtime: shiny
 
 output:
   html_document:
+    css: styles.css
     toc: true
     toc_depth: 3
     toc_float: true
     number_sections: true
     code_folding: hide
 ---
+
+![](images/Banner.png "title-banner")
 
 # Introduction
 
@@ -114,10 +112,18 @@ write.csv(d.full, "data/elo_ratings.csv", row.names = FALSE)
 
 ```
 
+# Conclusion
+
 # Sources
 
-<https://eloratings.net/about>
+FootyStats. (n.d.). *2026 FIFA World Cup stats: xG, corners, and over 2.5 goals*. Retrieved September 20, 2026, from <https://footystats.org/world-cup>
 
-<https://footystats.org/world-cup>
+Fédération Internationale de Football Association. (n.d.). *FIFA World Cup 2026 regulations*. <https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf>
 
-<https://digitalhub.fifa.com/m/636f5c9c6f29771f/original/FWC2026_regulations_EN.pdf>
+Fernandes Cruz, A. (n.d.). *2026 FIFA World Cup—Historical Elo ratings* [Data set]. Kaggle. <https://www.kaggle.com/datasets/afonsofernandescruz/2026-fifa-world-cup-historical-elo-ratings>
+
+World Football Elo Ratings. (n.d.). *About the ratings*. <https://eloratings.net/about>
+
+# Usage of Generative AI
+
+We declare that generative AI tools were used as a supporting tool during this project to assist with troubleshooting and resolving coding issues, and correcting grammar and language. All analytical decisions, interpretation of results and conclusions were developed by the authors. No generative AI was used for the analysis or interpretation of the findings. fi
