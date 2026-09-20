@@ -24,21 +24,25 @@ The project is organized as follows:
 .
 ├── README.md
 ├── main.Rmd
+├── styles.css
+│
+├── images/
+│   └── Banner.png
 │
 ├── data/
 │   ├── wc2026_qualifier_history.csv
 │   ├── actual_stage.csv
 │   ├── third_place_assignments_495.csv
 │   ├── calendar_ko.csv
-│   └── elo_ratings.csv
+│   ├── elo_ratings.csv
+│   ├── we_elo_ratings.csv
+│   └── elo_ratings_wc2026.csv
 │
 └── scripts/
     ├── world_cup.prediction.Rmd
     ├── world_cup_descriptive.Rmd
     ├── world_cup_clustering.Rmd
-    ├── wolrd_cup_simulation.Rmd
-    ├── we_elo_ratings.csv
-    └── elo_ratings_wc2026.csv
+    └── wolrd_cup_simulation.Rmd
 ```
 
 ### Main Files
@@ -46,6 +50,10 @@ The project is organized as follows:
 - `main.Rmd` - Main R Markdown document used to run and display the complete interactive project.
 
 - `README.md` - Provides an overview of the project, its structure, dependencies, and instructions for running it.
+
+### `images/`
+
+Contains images used in the report.
 
 ### `data/`
 
