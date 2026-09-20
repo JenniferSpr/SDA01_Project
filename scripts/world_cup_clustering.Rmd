@@ -30,7 +30,7 @@ The analysis identified three trajectory archetypes, plus one statistical outlie
 - **Curaçao** was flagged as a statistical outlier and excluded from the main clustering on account of its short, unusually volatile rating history.
 
 
-```{r cluster-traj, include=FALSE}
+```{r cluster-traj}
 # ---- 1. Build one time series per country (raw Elo rating by year) ----
 country_series <- d.full %>%
   filter(n() >= 8, .by = country) %>%
@@ -50,10 +50,10 @@ nn_z <- (nn_dist - mean(nn_dist)) / sd(nn_dist)
  
 outlier_check <- tibble(country = names(country_series), nn_dist = nn_dist, z = nn_z) %>%
   arrange(desc(z))
-print(outlier_check)
+#print(outlier_check)
  
 outlier_countries <- outlier_check %>% filter(z > 3) %>% pull(country)
-print(paste("Flagged as outliers:", paste(outlier_countries, collapse = ", ")))
+#print(paste("Flagged as outliers:", paste(outlier_countries, collapse = ", ")))
  
 country_series_main <- country_series[!names(country_series) %in% outlier_countries]
  
@@ -73,7 +73,7 @@ sil_scores <- map_dbl(2:7, function(k) {
                    distance = "dtw_basic", control = hierarchical_control(method = "average"))
   dtwclust::cvi(hc_k, type = "Sil")
 })
-print(tibble(k = 2:7, silhouette = round(sil_scores, 3)))
+#print(tibble(k = 2:7, silhouette = round(sil_scores, 3)))
  
 # ---- 4. Assign archetype names for clusters ----
 cluster_labels <- tibble(
@@ -101,7 +101,7 @@ cluster_rating <- cluster_rating %>%
   left_join(cluster_trend, by = "cluster") %>%
   arrange(desc(mean_current_rating))
  
-print(cluster_rating)
+#print(cluster_rating)
  
 archetype_map <- cluster_rating %>%
   mutate(archetype = case_when(
@@ -128,7 +128,7 @@ outlier_labels <- unique(cluster_labels$archetype[startsWith(cluster_labels$arch
 archetype_colors <- c(archetype_colors, set_names(rep("#999999", length(outlier_labels)), outlier_labels))
 ```
 
-```{r fig-cluster, echo=FALSE, warning=FALSE}
+```{r fig-cluster, warning=FALSE}
 
 # ---- 5. Spaghetti plot by cluster ----
 d.trajectories <- d.full %>%

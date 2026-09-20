@@ -83,7 +83,7 @@ As of the most recent snapshot (2026), Spain (2,177) and Argentina (2,151) lead 
 
 Looking at each team's distance from its own historical peak, Qatar (−360), Scotland (−359), and Czechia (−352) show the largest gaps between current and all-time-high rating, pointing to sustained decline from a stronger past. France, Norway, and Switzerland, by contrast, sit at their all-time peak (gap = 0), indicating they are currently playing at the strongest level in their history.
 
-```{r, echo=FALSE}
+```{r}
 
 ui <- fluidPage(
 
@@ -382,7 +382,7 @@ This analysis examines whether teams that play a larger share of their matches o
 
 Across all 48 teams, the correlation between the share of matches played at home and overall win rate is weak (r = 0.14). While the regression line has a positive slope, the relationship explains very little of the variance in win rate, suggesting that home-field advantage is not a strong driver of overall win rate once other factors are left uncontrolled.
 
-```{r, echo=FALSE, message=FALSE}
+```{r, message=FALSE}
 #| label: home-advantage
 
 d.home <- d.full %>%
@@ -457,7 +457,7 @@ This section investigates whether hosting the World Cup is associated with a mea
 
 Across the 19 historical World Cup hosts, the largest bumps were seen by England 1966 (+149), Argentina 1978 (+139), and Sweden 1958 (+115), while Qatar 2022 (−79) and Mexico 1970 (−67) were notable exceptions that declined during their hosting year.
 
-```{r host-effect-setup, echo=FALSE}
+```{r host-effect-setup}
 
 # Host nations, 1930-2022
 host_events <- tribble(
@@ -521,7 +521,7 @@ host_stats <- map2(host_events$year, host_events$country, get_host_stats) %>%
 
 ```
 
-```{r fig-host-effect, echo=FALSE, fig.height=8 }
+```{r fig-host-effect, fig.height=8 }
 
 plot_data <- host_stats %>%
   select(label, year, bump_during, pre_avg, host_rating, post_rating) %>%
@@ -563,7 +563,7 @@ host_bump_plot
 
 The host effect was evaluated using Elo ratings for all `count(host_stats)` historical hosts, comparing the three-year pre-host average to the host year, and the host year to one year post-host, using paired t-tests and Wilcoxon signed-rank tests (the latter as a robustness check given the small sample size).
 
-```{r host-effect-tests, echo=FALSE, warning=FALSE}
+```{r host-effect-tests, warning=FALSE}
 
 # (a) Pre-host baseline vs host year -> is there a bump?
 t_pre_vs_host <- t.test(host_stats$host_rating, host_stats$pre_avg,
@@ -582,7 +582,7 @@ w_host_vs_post <- wilcox.test(host_stats$post_rating, host_stats$host_rating,
 
 Both tests agree: hosting is associated with a significant mean rating bump (`r round(t_pre_vs_host$estimate, 1)` points, t-test: p = `r round(t_pre_vs_host$p.value, 3)`; Wilcoxon: p = `r round(w_pre_vs_host$p.value, 3)`), while the mean post-host decline (`r round(t_host_vs_post$estimate, 1)` points) is not statistically significant (t-test: p = `r  round(t_host_vs_post$p.value, 3)`; Wilcoxon: p = `r round(w_host_vs_post$p.value, 3)`) (see @tbl-host-effect-tests).
 
-```{r tbl-host-effect-tests, echo=FALSE, warning=FALSE}
+```{r tbl-host-effect-tests, warning=FALSE}
 
 ttest_table <- bind_rows(
   tidy(t_pre_vs_host)  %>% mutate(comparison = "Host year vs. pre-host (3yr avg)", test = "Paired t-test"),
@@ -665,7 +665,7 @@ The teams are grouped as follows:
 - **Traditional power** (10+ total qualifications, at least 2 consecutive recent appearances): Brazil, Germany, Argentina, Mexico, England, France, Spain, Uruguay, Belgium, Switzerland, Netherlands, South Korea, United States
 - **Occasional qualifier**: all remaining teams not meeting the criteria above
 
-```{r qualifier-groups, echo=FALSE, message=FALSE}
+```{r qualifier-groups, message=FALSE}
 
 # Groups:
 #   (Source: https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_qualification)
