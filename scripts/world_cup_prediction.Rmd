@@ -180,7 +180,7 @@ glm_results
 
 The odds ratios provide an interpretation of the estimated effects of the predictors on the likelihood of reaching at least the Round of 16.
 
-- Rating: OR = 1.011. A one-point increase in Elo rating is associated with approximately a 1.07% increase in the odds of reaching at least the Round of 16, holding the other predictors constant. This association is statistically significant (p = 0.002).
+- Rating: OR = 1.011. A one-point increase in Elo rating is associated with approximately a 1.1% increase in the odds of reaching at least the Round of 16, holding the other predictors constant. This association is statistically significant (p = 0.002).
 
 - Rating gap: OR = 1.001. The estimated effect is very small, and the association is not statistically significant (p = 0.775). Therefore, the rating gap does not provide clear evidence of an additional association with reaching the Round of 16 in this model.
 
