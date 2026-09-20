@@ -11,7 +11,7 @@ Building on the previous analyses, this section moves from describing and groupi
 
 **1. Prepare the 2026 prediction dataset**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # Load required packages
 library(tidyverse)
 library(here)
@@ -20,6 +20,10 @@ library(ranger)
 library(yardstick)
 library(rsample)
 library(ggrepel)
+
+# Load data
+d.full <- read.csv(here("data", "elo_ratings.csv"))
+d.wc <- read.csv(here("data", "wc_elo_ratings.csv"))
 
 # Extract the pre-tournament snapshot
 # Chose2025-12-31 as the last annual snapshot before the start of the 2026 World Cup
@@ -67,12 +71,12 @@ The resulting dataset contains 48 teams, corresponding to the 48 teams participa
 **2. Define the prediction outcome**
 
 ```{r}
-d.raw |>
+d.full |>
   filter(year == 2026) |>
   count(snapshot_date)
 ```
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # advanced = 1 indicates that a team reached the Round of 16
 # advanced = 0 indicates elimination in the group stage or Round of 32
 
@@ -96,7 +100,7 @@ The prediction problem under investigation is therefore formulated as follows: T
 
 **3. Feature engineering**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # create two new variables:
 # ・rating_gap: measures how far a team's current Elo rating is below its historical maximum Elo rating. 
 # 　A larger value therefore indicates a larger distance from the team's historical peak.
@@ -119,7 +123,7 @@ The resulting dataset contains the original team-level predictors together with 
 
 **4. Select predictors**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # Use a correlation matrix to check the correlations between the variables.
 d.predict2026 |>
   select(
@@ -184,7 +188,7 @@ team's historical maximum Elo rating and its current rating, and its historical 
 
 ***GLM Model***
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # Fit a simplified logistic regression model
 glm_model <- glm(
   advanced ~ rating + rating_gap + win_rate,
@@ -253,7 +257,7 @@ $$
 
 ***Random Forest Model***
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # Store out-of-fold predictions
 cv.results <- tibble(
   country = d.predict2026$country,
@@ -332,7 +336,7 @@ The table shows the out-of-fold predicted probabilities for each team. The GLM a
 
 **7. Compare GLM and Random Forest**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # Calculate classification accuracy
 glm_accuracy <- mean(
   if_else(
@@ -393,7 +397,7 @@ The cross-validated results provide a more informative assessment of out-of-samp
 
 **8. Generate final GLM probabilities for the 48 teams**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 d.predict2026 <- d.predict2026 |>
   mutate(
     glm_probability = predict(
@@ -416,7 +420,7 @@ The GLM was fitted using all 48 teams and the pre-tournament predictors. The res
 
 **9. Visualize predicted probabilities**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 # Prepare data for the probability plot
 plot_data <- d.predict2026 |>
   arrange(glm_probability) |>
@@ -494,7 +498,7 @@ This illustrates that although the GLM captures a clear relationship between the
 
 **10. Examine cross-validated prediction errors**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 cv.results <- cv.results |>
   mutate(
     glm_prediction = if_else(
@@ -523,7 +527,7 @@ The errors also help explain the model's higher specificity than sensitivity: th
 
 **11. Final performance metrics**
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 conf_matrix <- table(
   Prediction = cv.results$glm_prediction,
   Actual = cv.results$actual
@@ -558,7 +562,7 @@ ggplot(
 
 The confusion matrix shows the classification results of the cross-validated GLM at a 0.5 probability threshold. Of the 32 teams that did not advance to the Round of 16, 26 were correctly classified, while 6 were incorrectly classified as advancing. Among the 16 teams that actually advanced, 8 were correctly identified and 8 were incorrectly classified as not advancing. Thus, the model produced 34 correct classifications and 14 mis-classifications out of 48 teams.
 
-```{r cache=True, echo=False}
+```{r cache=TRUE, echo=FALSE}
 accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
 
 sensitivity <- conf_matrix["1", "1"] /
