@@ -41,9 +41,9 @@ country_colors <- setNames(scales::hue_pal()(length(all_countries)), all_countri
 
 ## Country Statistics Overview
 
-This table summarizes each qualified country's Elo statistics as of its most recent recorded year, including mean, minimum, and maximum rating; best and worst FIFA rank achieved; and overall win percentage. 
+This table summarizes each qualified country's Elo statistics as of its most recent recorded year, including mean, minimum, and maximum rating; best and worst FIFA rank achieved; and overall win percentage.
 
-Across the 48 qualified nations, Brazil leads on mean historical Elo rating (1,998), followed closely by Argentina (1,987) and England (1,983), reflecting their sustained dominance across the full observation window. In contrast, Cape Verde holds the lowest mean Elo rating (1,302). Brazil also posts the highest career win rate (63.0%), ahead of Spain (59.2%) and England (59.0%). 
+Across the 48 qualified nations, Brazil leads on mean historical Elo rating (1,998), followed closely by Argentina (1,987) and England (1,983), reflecting their sustained dominance across the full observation window. In contrast, Cape Verde holds the lowest mean Elo rating (1,302). Brazil also posts the highest career win rate (63.0%), ahead of Spain (59.2%) and England (59.0%).
 
 ```{r tbl-sum, echo=FALSE}
 
@@ -378,7 +378,7 @@ shinyApp(ui, server, options = list(width = "100%", height = "1000px"))
 
 ## Is There a Home Advantage?
 
-This analysis examines whether teams that play a larger share of their matches on home are associating with higher win rates. For each country, the share of matches played at home is plotted against overall win rate, with points colored by current Elo rating and with a linear fit to summarize the relationship. 
+This analysis examines whether teams that play a larger share of their matches on home are associating with higher win rates. For each country, the share of matches played at home is plotted against overall win rate, with points colored by current Elo rating and with a linear fit to summarize the relationship.
 
 Across all 48 teams, the correlation between the share of matches played at home and overall win rate is weak (r = 0.14). While the regression line has a positive slope, the relationship explains very little of the variance in win rate, suggesting that home-field advantage is not a strong driver of overall win rate once other factors are left uncontrolled.
 
@@ -455,7 +455,7 @@ plot_ly() %>%
 
 This section investigates whether hosting the World Cup is associated with a measurable change in a nation's Elo rating, independent of match outcomes. For each of the 19 historical hosts (1930–2022), Elo ratings are compared across three stages, the three-year pre-host average, the host year itself, and one year after hosting, to assess whether host nations experience a rating bump during the tournament, and whether any such bump persists or reverts afterward.
 
-Across the 19 historical World Cup hosts, the largest bumps were seen by England 1966 (+149), Argentina 1978 (+139), and Sweden 1958 (+115), while Qatar 2022 (−79) and Mexico 1970 (−67) were notable exceptions that declined during their hosting year. 
+Across the 19 historical World Cup hosts, the largest bumps were seen by England 1966 (+149), Argentina 1978 (+139), and Sweden 1958 (+115), while Qatar 2022 (−79) and Mexico 1970 (−67) were notable exceptions that declined during their hosting year.
 
 ```{r host-effect-setup, echo=FALSE}
 
@@ -561,7 +561,7 @@ host_bump_plot <- ggplot(plot_data, aes(x = rating, y = label)) +
 host_bump_plot
 ```
 
-The host effect was evaluated using Elo ratings for all `r count(host_stats)` historical hosts, comparing the three-year pre-host average to the host year, and the host year to one year post-host, using paired t-tests and Wilcoxon signed-rank tests (the latter as a robustness check given the small sample size).
+The host effect was evaluated using Elo ratings for all `count(host_stats)` historical hosts, comparing the three-year pre-host average to the host year, and the host year to one year post-host, using paired t-tests and Wilcoxon signed-rank tests (the latter as a robustness check given the small sample size).
 
 ```{r host-effect-tests, echo=FALSE, warning=FALSE}
 
@@ -654,17 +654,16 @@ ttest_table
 wilcoxon_table
 ```
 
-
 ## Elo trajectory: debutant/returning teams vs traditional qualifiers
 
-This section evaluates the Elo rating trajectory between `debutants`, `Returners`, `traditional power`, and `occasional qualifier`. Additional data source containing World Cup qualifier history was used in this analysis, which is available on [Wikipedia](https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_qualification). 
+This section evaluates the Elo rating trajectory between `debutants`, `returners`, `traditional power`, and `occasional qualifier`. Additional data source containing World Cup qualifier history was used in this analysis, which is available on [Wikipedia](https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_qualification).
 
 The teams are grouped as follows:
 
-  - **Debutants** (first qualified in 2026): Cape Verde, Curacao, Jordan, and Uzbekistan
-  - **Returners** (second-ever appearance, after a long gap since their first): Haiti, DR Congo, Iraq, Panama, Bosnia and Herzegovina
-  - **Traditional power** (10+ total qualifications, at least 2 consecutive recnet appearances): Brazil, Germany, Argentina, Mexico, England, France, Spain, Uruguay, Belgium, Switzerland, Netherlands, South Korea, United States
-  - **Occasional qualifier**: all remaining teams not meeting the criteria above
+- **Debutants** (first qualified in 2026): Cape Verde, Curacao, Jordan, and Uzbekistan
+- **Returners** (second-ever appearance, after a long gap since their first): Haiti, DR Congo, Iraq, Panama, Bosnia and Herzegovina
+- **Traditional power** (10+ total qualifications, at least 2 consecutive recent appearances): Brazil, Germany, Argentina, Mexico, England, France, Spain, Uruguay, Belgium, Switzerland, Netherlands, South Korea, United States
+- **Occasional qualifier**: all remaining teams not meeting the criteria above
 
 ```{r qualifier-groups, echo=FALSE, message=FALSE}
 
@@ -730,4 +729,3 @@ plot_ly(elo_by_group, x = ~year, y = ~avg_rating,
     autosize = TRUE
   )
 ```
-
