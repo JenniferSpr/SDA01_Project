@@ -15,9 +15,11 @@ output:
 
 # Introduction
 
-Football's global balance of power is constantly shifting: new generations emerge, football cultures develop, and confederations rise or fade in strength. Yet this evolution is easy to miss when teams are judged only by tournament results, which capture a single moment rather than a long run trend. Elo ratings offer a way to track that evolution directly. Unlike official rankings, they update continuously based on match outcomes, opponent quality, and game significance, giving a dynamic, historically comparable measure of team strength.
+Football's global balance of power is constantly shifting: new generations emerge, football cultures develop, and confederations rise or fade in strength. Yet this evolution is easy to miss when teams are judged only by tournament results, which capture a single moment rather than a long run trend. Elo ratings offer a way to track that evolution directly. Indeed, they update continuously based on match outcomes, opponent quality, and game significance, giving a dynamic, historically comparable measure of team strength.
 
-This project uses over a century of historical Elo ratings for national football teams to explore how global football power has shifted across countries, confederations, and time, using the 2026 FIFA World Cup as a focal point. Rather than treating the tournament as an isolated event, we situate it within each team's long run trajectory, asking whether traditional powers still dominate, whether confederation strength is converging, and how debutant or returning nations compare to established qualifiers.
+This project uses over a century of historical Elo ratings for national football teams to explore how global football power has shifted across countries, confederations, and time, using the 2026 FIFA World Cup as a focal point. Rather than treating the tournament as an isolated event, we situate it within each team's long run trajectory, asking whether traditional powers still dominate, whether confederation strength is converging, and how debutant or returning nations compare to established qualifiers. Building on this historical analysis, we also develop predictive models to examine team performance and simulate the 2026 FIFA World Cup to explore potential tournament outcomes.
+
+These insights are particularly relevant to football analysts and researchers, sports data scientists and data-driven sports journalists. The combination of historical analysis, statistical modeling and tournament simulation provides a quantitative framework for examining long-term shifts in competitive strength and assessing team performance in the context of the 2026 FIFA World Cup.
 
 # Data Source
 
