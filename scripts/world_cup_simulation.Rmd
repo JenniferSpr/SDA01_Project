@@ -523,7 +523,7 @@ run_cup_mc <- function(number_of_simulations) {
 }
 ```
 
-# Interactive App
+## Interactive App
 
 The following interactive application allows users to choose the number of simulations and a random seed. Using the same seed and settings reproduces the predictions, while changing the seed generates a different simulation run.
 
@@ -1086,7 +1086,7 @@ output$single_matches <- renderUI({
 })
 ```
 
-# Results
+## Results
 
 We simulated the World Cup 1000 times to explore three main questions : which teams are the favourites to win the title, how far each team is expected to progress and which group-stage outcomes were the most surprising compared with the model's predictions.
 
@@ -1098,7 +1098,7 @@ set.seed(123)
 mc_results <- run_cup_mc(1000)
 ```
 
-## Who are the favourite ?
+### Who are the favourite ?
 
 ```{r favourite, fig.align='center'}
 # select top 10 
@@ -1127,7 +1127,7 @@ Across the 1000 simulations, Spain has the highest estimated probability of winn
 
 England ranks fourth with a probability of 9.2%. Spain is therefore approximately 2.7 times as likely to win as England, which highlights the gap between the leading favorite and the fourth-ranked team.
 
-## How far are teams expected to go ?
+### How far are teams expected to go ?
 
 Although Spain, Argentina and France account for most of the estimated title probability, it can also be useful to examine how far each team is likely to progress in the tournament according to team's strength.
 
@@ -1189,7 +1189,7 @@ The heatmap displays each team's probability of reaching each stage, with teams 
 
 For example, Bosnia and Herzegovina has the tenth-lowest Elo rating but a 64.3% probability of qualifying for the round of 32. This exceeds the qualification probabilities of some higher-rated teams such as Algeria or the United States.
 
-## Which group-stage outcomes were the most surprising ?
+### Which group-stage outcomes were the most surprising ?
 
 We compare each team's actual group-stage outcome with its simulated probability of reaching the round of 32. This allows us to identify unexpected qualifications, where teams advanced despite a low predicted probability, and unexpected eliminations, where teams failed to qualify despite a high predicted probability.
 
@@ -1305,7 +1305,7 @@ Uruguay's elimination was the most surprising group-stage outcome according to t
 
 Ghana showed the opposite pattern, qualifying despite a predicted qualification probability of only 28.5%. These results illustrate both unexpected eliminations and an unexpected qualification.
 
-# Conclusion and limitations
+## Conclusion and limitations
 
 We reconstructed the 2026 World Cup using the official group composition and knockout schedule, with match outcomes simulated using Elo ratings and a separate model for draws. By repeating the tournament 1000 times, we estimated each team's probability of reaching each stage and winning the title.
 

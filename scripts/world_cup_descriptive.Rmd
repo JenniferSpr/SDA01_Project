@@ -373,7 +373,7 @@ server <- function(input, output, session) {
   })
 }
 
-shinyApp(ui, server, options = list(width = "100%", height = "1450px"))
+shinyApp(ui, server, options = list(width = "100%", height = "1000px"))
 ```
 
 ## Is There a Home Advantage?
@@ -521,7 +521,7 @@ host_stats <- map2(host_events$year, host_events$country, get_host_stats) %>%
 
 ```
 
-```{r fig-host-effect, echo=FALSE, fig.height=8}
+```{r fig-host-effect, echo=FALSE, fig.height=8 }
 
 plot_data <- host_stats %>%
   select(label, year, bump_during, pre_avg, host_rating, post_rating) %>%
@@ -563,7 +563,7 @@ host_bump_plot
 
 The host effect was evaluated using Elo ratings for all `r count(host_stats)` historical hosts, comparing the three-year pre-host average to the host year, and the host year to one year post-host, using paired t-tests and Wilcoxon signed-rank tests (the latter as a robustness check given the small sample size).
 
-```{r host-effect-tests, echo=FALSE}
+```{r host-effect-tests, echo=FALSE, warning=FALSE}
 
 # (a) Pre-host baseline vs host year -> is there a bump?
 t_pre_vs_host <- t.test(host_stats$host_rating, host_stats$pre_avg,

@@ -5,11 +5,9 @@ output:
 runtime: shiny
 ---
 
-## Prediction
-
 Building on the previous analyses, this section moves from describing and grouping team characteristics to testing their predictive value. We investigate whether pre-tournament information can help distinguish teams that progress to at least the Round of 16 in the 2026 World Cup. 
 
-**1. Prepare the 2026 prediction dataset**
+## Prepare prediction dataset
 
 ```{r cache=TRUE, echo=FALSE}
 # Load required packages
@@ -68,7 +66,7 @@ sum(is.na(d.predict2026$wc2026_exit_round))
 
 The resulting dataset contains 48 teams, corresponding to the 48 teams participating in the 2026 World Cup. No teams have missing tournament outcomes after the join, confirming that all 48 teams were successfully matched with their observed 2026 results.
 
-**2. Define the prediction outcome**
+## Define the prediction outcome
 
 ```{r}
 d.full |>
@@ -98,7 +96,7 @@ The outcome distribution contains 32 teams classified as not advancing (advanced
 
 The prediction problem under investigation is therefore formulated as follows: To what extent can pre-tournament team characteristics distinguish between teams that progress to at least the Round of 16 and those eliminated in the earlier stages of the tournament?
 
-**3. Feature engineering**
+## Feature engineering
 
 ```{r cache=TRUE, echo=FALSE}
 # create two new variables:
@@ -121,7 +119,7 @@ d.predict2026
 
 The resulting dataset contains the original team-level predictors together with the newly created "rating_gap" and "win_rate" variables. "is_host" and "confederation" have also been converted to factors for use in the statistical models.
 
-**4. Select predictors**
+## Select predictors
 
 ```{r cache=TRUE, echo=FALSE}
 # Use a correlation matrix to check the correlations between the variables.
@@ -139,7 +137,7 @@ The correlation matrix shows a very strong negative correlation between "rating"
 
 The correlations among the remaining predictors are considerably weaker. Therefore, "rating_gap" and "win_rate" were retained as additional predictors.
 
-**5. Fit the GLM Model**
+## Fit the GLM Model
 
 ***Mathematical Formulation***
 
@@ -225,7 +223,7 @@ The odds ratios provide an interpretation of the estimated effects of the predic
 ・Rating gap: OR = 1.0012. The estimated effect is very small, and the association is not statistically significant (p = 0.775). Therefore, the rating gap does not provide clear evidence of an additional association with reaching the Round of 16 in this model.\
 ・Win rate: OR = 0.1213. The model estimates lower estimated odds of reaching the Round of 16 at higher values of win rate. However, this association is not statistically significant (p = 0.708), so the estimated negative direction should not be interpreted as evidence of a meaningful relationship.\
 
-**6. Fit a Random Forest model**
+## Fit a Random Forest model
 
 ***Mathematical Formulation***
 
@@ -334,7 +332,7 @@ cv.results
 
 The table shows the out-of-fold predicted probabilities for each team. The GLM and Random Forest probabilities are generated from models trained without the respective team's observation, allowing their predictive performance to be compared using cross-validation.
 
-**7. Compare GLM and Random Forest**
+## Compare GLM and Random Forest
 
 ```{r cache=TRUE, echo=FALSE}
 # Calculate classification accuracy
@@ -395,7 +393,7 @@ The Random Forest did not improve classification accuracy and had a higher Brier
 
 The cross-validated results provide a more informative assessment of out-of-sample performance than evaluating predictions on the same observations used for model fitting. Since both models were evaluated on the same held-out folds, the comparison provides a consistent basis for assessing their predictive performance.
 
-**8. Generate final GLM probabilities for the 48 teams**
+## Generate final GLM probabilities for the 48 teams
 
 ```{r cache=TRUE, echo=FALSE}
 d.predict2026 <- d.predict2026 |>
@@ -418,7 +416,7 @@ d.predict2026 |>
 
 The GLM was fitted using all 48 teams and the pre-tournament predictors. The resulting fitted probabilities represent the model's estimated probability that each team would reach at least the Round of 16. The teams are ordered from highest to lowest predicted probability. For example, Spain received the highest predicted probability (93.5%), followed by Argentina (89.8%) and France (85.1%).
 
-**9. Visualize predicted probabilities**
+## Visualize predicted probabilities
 
 ```{r cache=TRUE, echo=FALSE}
 # Prepare data for the probability plot
@@ -496,7 +494,7 @@ The plot also highlights several misclassified teams, whose country names are la
 
 This illustrates that although the GLM captures a clear relationship between the pre-tournament predictors and tournament progression, the predictions are not perfect. In particular, teams with probabilities close to the 50% threshold are relatively uncertain cases, while the model is more confident about teams at the extreme ends of the probability range.
 
-**10. Examine cross-validated prediction errors**
+## Examine cross-validated prediction errors
 
 ```{r cache=TRUE, echo=FALSE}
 cv.results <- cv.results |>
@@ -525,7 +523,7 @@ The cross-validated errors show that the logistic regression model made both fal
 
 The errors also help explain the model's higher specificity than sensitivity: the model was better at identifying teams that did not advance than teams that actually advanced.
 
-**11. Final performance metrics**
+## Final performance metrics
 
 ```{r cache=TRUE, echo=FALSE}
 conf_matrix <- table(
@@ -593,7 +591,7 @@ The cross-validated GLM achieved an overall accuracy of 70.8%, correctly classif
 
 The Brier Score was 0.1804, providing an assessment of the predicted probabilities rather than only the final classifications. Lower Brier Scores indicate better probabilistic prediction performance.
 
-***Conclusion***
+## Conclusion
 
 The analysis shows that pre-tournament information can provide useful signals for distinguishing teams with a higher likelihood of advancing to at least the Round of 16. Among the predictors included in the logistic regression, Elo rating was the only statistically significant predictor.
 
