@@ -9,6 +9,13 @@ The World Cup is a tournament in which small differences in team strength and in
 
 We simulate the 2026 World Cup using the official group structure and Elo ratings to represent team strength. By repeating the tournament many times through Monte Carlo simulation, we estimate each team's probability of reaching the round of 32, round of 16, quarter-finals, semi-finals and final, as well as winning the title. The aim is not to predict one exact tournament outcome, but to explore a range of plausible outcomes and identify the teams most likely to succeed.
 
+```{r setup_wc_s, include=FALSE}
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE
+)
+```
+
 ```{r libraries_wc, include=FALSE}
 # load libraries
 library(here)
@@ -141,7 +148,7 @@ Recent World Cups provide a reference for the frequency of draws. Across all mat
 
 To decide on the value of $\sigma$, we compared the resulting draw probabilities across several possible values, as shown in the table below.
 
-```{r sigma, echo=FALSE}
+```{r sigma, echo=FALSE, warning=FALSE}
 # create combinations of Elo differences and sigma values
 expand.grid(
   rating_gap = c(0, 100, 200, 300, 400),
@@ -340,7 +347,7 @@ qualify_r32 <- function() {
 
 Once a team qualifies, it enters the knockout phase, where each match must produce a winner. The winner advances to the next round, while the loser is eliminated. We use the Elo formula directly to model each team's probability of winning the match, as draws are no longer possible.
 
-```{r knockout_function}
+```{r knockout_function, warning=FALSE}
 # simulate one match
 knockout_match <- function(team_a, team_b) {
   # rating difference
@@ -365,44 +372,50 @@ knockout_match <- function(team_a, team_b) {
 
 The knockout matches follow a predefined schedule. We decided to use the official schedule to maintain consistency with the group composition. Indeed, each team's position in its group determines its possible route through the knockout stage, including which opponents it could face and at which stage.
 
-```{r calendar}
+```{r calendar, warning=FALSE}
 # load calendar
 calendar_ko <- read.csv(
   here("data", "calendar_ko.csv"),
   stringsAsFactors = FALSE,
   colClasses = "character"
 )
+```
 
+```{r show_calendar}
 # show calendar
-calendar_ko %>%
-  gt() %>%
-  tab_header(
-    title = "World Cup Knockout Stage Calendar"
-  ) %>%
-  tab_style(
-    style = cell_text(weight = "bold"),
-    locations = cells_column_labels()
-  ) %>%
-  tab_style(
-    style = cell_borders(
-      sides = c("left", "right"),
-      color = "grey80",
-      weight = px(1)
-    ),
-    locations = cells_body(
-      columns = everything()
+htmltools::div(
+  style = "max-height: 500px; overflow-y: auto;",
+  
+  calendar_ko %>%
+    gt() %>%
+    tab_header(
+      title = "World Cup Knockout Stage Calendar"
+    ) %>%
+    tab_style(
+      style = cell_text(weight = "bold"),
+      locations = cells_column_labels()
+    ) %>%
+    tab_style(
+      style = cell_borders(
+        sides = c("left", "right"),
+        color = "grey80",
+        weight = px(1)
+      ),
+      locations = cells_body(
+        columns = everything()
+      )
+    ) %>%
+    tab_style(
+      style = cell_borders(
+        sides = c("left", "right"),
+        color = "grey70",
+        weight = px(1)
+      ),
+      locations = cells_column_labels(
+        columns = everything()
+      )
     )
-  ) %>%
-  tab_style(
-    style = cell_borders(
-      sides = c("left", "right"),
-      color = "grey70",
-      weight = px(1)
-    ),
-    locations = cells_column_labels(
-      columns = everything()
-    )
-  )
+)
 ```
 
 The schedule contains each match's number, round and references to team A and team B.
@@ -641,7 +654,7 @@ tagList(
       "
       .wc-app {
         width: 100%;
-        height: 850px;
+        height: 700px;
         overflow-y: auto;
         overflow-x: hidden;
         padding: 15px;
@@ -1039,7 +1052,10 @@ champion_plot <- plot_ly(
          xaxis = list(title = "Probability of winning", ticksuffix = "%"))
 
 # show
-champion_plot
+htmltools::div(
+  style = "display: flex; justify-content: center;",
+  champion_plot
+)
 ```
 
 ```{r values_champions, include=FALSE}
@@ -1107,8 +1123,9 @@ heatmap_plot <- plot_ly(
     "Probability: %{z:.1f}",
     "<extra></extra>"
   ),
-  colorbar = list(title = "Probability", ticksuffix = "%")
-) %>%
+  colorbar = list(title = "Probability", ticksuffix = "%"),
+  width = 870,
+height = 1100) %>%
   layout(
     title = "How far could each team go?",
     xaxis = list(title = "", side = "top"),
@@ -1116,7 +1133,15 @@ heatmap_plot <- plot_ly(
   )
 
 # show
-heatmap_plot
+htmltools::div(
+  style = "
+    max-height: 600px;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+  ",
+  heatmap_plot
+)
 ```
 
 The heatmap displays each team's probability of reaching each stage, with teams ordered by Elo rating from highest to lowest. It shows that a higher ranking does not always correspond to a higher probability of advancing. Indeed, as seen for the Round of 32, advancement probabilities would be expected to generally decrease as Elo ratings decline. However, this pattern is not strictly observed, which suggests that tournament progression is influenced not only by team strength.
@@ -1127,7 +1152,7 @@ We compare each team's actual group-stage outcome with its simulated probability
 
 The actual results were :
 
-```{r actual_results}
+```{r actual_results, warning=FALSE}
 # load data
 actual_results <- read.csv2(
   here("data", "actual_stage.csv"),
@@ -1139,7 +1164,7 @@ actual_results <- read.csv2(
   mutate(team = trimws(team), actual_stage = toupper(trimws(actual_stage)))
 
 # show
-actual_results %>%
+actual_results_table <- actual_results %>%
   gt() %>%
   
   tab_header(
@@ -1173,11 +1198,16 @@ actual_results %>%
       columns = everything()
     )
   )
+
+htmltools::div(
+  style = "max-height: 500px; overflow-y: auto;",
+  actual_results_table
+)
 ```
 
 The qualification probability is the proportion of Monte Carlo simulations in which a team reached the round of 32. We compare this probability with what actually happened : if a team actually qualified we use the qualification probability. If it was eliminated, we use $1 - p$, where $p$ is the qualification probability. A lower probability for the actual outcome indicates a more surprising result according to the simulations.
 
-```{r group_surprises_plot, fig.align='center', fig.height=12, fig.width=10}
+```{r group_surprises_plot, warning=FALSE}
 # group data
 group_surprises <- mc_results %>%
   select(team, R32) %>%
@@ -1198,6 +1228,8 @@ group_surprises <- mc_results %>%
 
 
 # plot
+plot_height <- nrow(group_surprises) * 25
+
 surprises_plot <- plot_ly(
   data = group_surprises,
   x = ~R32,
@@ -1211,6 +1243,8 @@ surprises_plot <- plot_ly(
   mode = "markers",
   marker = list(size = 10),
   text = ~team,
+  height = plot_height,
+  width = 850,
   hovertemplate = paste0(
     "<b>%{text}</b><br>",
     "Probability: %{x:.1f}%",
@@ -1240,12 +1274,20 @@ surprises_plot <- plot_ly(
   )
 
 # show
-surprises_plot
+htmltools::div(
+  style = "
+    max-height: 650px;
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+  ",
+  surprises_plot
+)
 ```
 
 The teams are ordered by their predicted probability of reaching the round of 32. The most unexpected outcomes are qualifications, shown in green, at the low-probability end, and eliminations, shown in orange, at the high-probability end. The ten most surprising outcomes are listed below :
 
-```{r top_surprises}
+```{r top_surprises, warning=FALSE}
 # group data
 top_surprises <- group_surprises %>%
   arrange(observed_probability) %>%
