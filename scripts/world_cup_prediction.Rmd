@@ -289,17 +289,8 @@ This shows that the 50% classification rule does not correctly classify all 48 o
 
 ## Conclusion
 
-Within this sample, the GLM identified an association between pre-tournament Elo rating and reaching at least the Round of 16. Among the predictors included in the logistic regression, Elo rating was the only statistically significant predictor. Higher Elo ratings were associated with higher odds of advancing, while rating gap and win rate did not show statistically significant evidence of an association with tournament progression.
+Within this sample, the GLM provided evidence of an association between the included pre-tournament predictors and reaching at least the Round of 16. Compared with the intercept-only model, the GLM showed a substantial reduction in deviance, indicating an improved overall model fit. Among the individual predictors included in the logistic regression, Elo rating was the only statistically significant predictor. Higher Elo ratings were associated with higher odds of advancing, while rating gap and win rate did not show statistically significant evidence of an association with tournament progression.
 
 The GLM was fitted using the 48 teams and their pre-tournament characteristics. The resulting fitted probabilities provide a model-based summary of the estimated probability of reaching at least the Round of 16 for each team. When a 50% threshold was used for classification, the model produced both false-positive and false-negative classifications. Some teams received relatively high fitted probabilities but did not advance, while some teams with fitted probabilities below 50% nevertheless reached the Round of 16. This illustrates that the observed tournament outcomes are not completely separated by the pre-tournament predictors included in the model.
 
-## Limitations
-
-Several limitations should be considered when interpreting these results. First, the analysis is based on only 48 teams, which represents a relatively small sample for a logistic regression model with multiple predictors. This limits the precision of the estimated coefficients and the extent to which the findings can be generalized beyond this tournament.
-
-Second, the GLM was fitted and evaluated on the same 48 teams. Therefore, the fitted probabilities and the classifications shown in the analysis describe how the model fits the observed data and should not be interpreted as an out-of-sample assessment of predictive performance. No cross-validation or separate test set was used in this analysis.
-
-Third, the outcome is based on the observed 2026 World Cup results, while the predictors are measured before the tournament. Tournament progression can also be affected by factors not included in the model, such as the specific draw, match-level performance, injuries, and other tournament circumstances. Therefore, the model does not capture all factors that may contribute to reaching the Round of 16.
-
-Finally, the 50% threshold is a classification rule rather than a statistical conclusion. Changing the threshold would change the number of false-positive and false-negative classifications. The fitted probabilities should therefore be interpreted as model-based estimates conditional on the predictors included in this GLM, rather than as actual probabilities of tournament progression.
-
+Overall, the results suggest that the GLM captured a meaningful relationship between pre-tournament team characteristics and tournament progression in this sample, while not perfectly classifying all observed outcomes. However, the findings should be interpreted with caution because the analysis is based on only 48 teams, the model was evaluated on the same data used for fitting, and other tournament-related factors not included in the model may also influence progression.
