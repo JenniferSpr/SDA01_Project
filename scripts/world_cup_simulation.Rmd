@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r libraries_wc, include=FALSE}
+```{r libraries_wc, include = FALSE}
 # load libraries
 library(here)
 library(gt)
@@ -150,45 +150,30 @@ To decide on the value of $\sigma$, we compared the resulting draw probabilities
 
 ```{r sigma, echo=FALSE, warning=FALSE}
 # create combinations of Elo differences and sigma values
-expand.grid(
-  rating_gap = c(0, 100, 200, 300, 400),
-  sigma = c(100, 150, 200, 250, 300)
-) %>%
+expand.grid(rating_gap = c(0, 100, 200, 300, 400),
+            sigma = c(100, 150, 200, 250, 300)) %>%
   
   # draw probability for each combination
-  mutate(
-    draw_probability =
-      0.30 * exp(-(rating_gap^2) / (2 * sigma^2))
-  ) %>%
+  mutate(draw_probability =
+           0.30 * exp(-(rating_gap^2) / (2 * sigma^2))) %>%
   
-  # reshape 
-  pivot_wider(
-    names_from = sigma,
-    values_from = draw_probability,
-    names_prefix = "σ = "
-  ) %>%
+  # reshape
+  pivot_wider(names_from = sigma,
+              values_from = draw_probability,
+              names_prefix = "σ = ") %>%
   
-  # create table 
+  # create table
   gt(rowname_col = "rating_gap") %>%
-  tab_header(
-    title = "Draw probability under different values of σ"
-  ) %>%
-  tab_stubhead(
-    label = "Elo difference"
-  ) %>%
-  fmt_percent(
-    columns = starts_with("σ"),
-    decimals = 1
-  )%>%
+  tab_header(title = "Draw probability under different values of σ") %>%
+  tab_stubhead(label = "Elo difference") %>%
+  fmt_percent(columns = starts_with("σ"), decimals = 1) %>%
   tab_style(
     style = cell_borders(
       sides = c("left", "right"),
       color = "grey80",
       weight = px(1)
     ),
-    locations = cells_body(
-      columns = everything()
-    )
+    locations = cells_body(columns = everything())
   ) %>%
   tab_style(
     style = cell_borders(
@@ -196,28 +181,15 @@ expand.grid(
       color = "grey70",
       weight = px(1)
     ),
-    locations = cells_column_labels(
-      columns = everything()
-    )
+    locations = cells_column_labels(columns = everything())
   ) %>%
-  tab_style(
-    style = cell_text(weight = "bold"),
-    locations = cells_column_labels()
-  )%>%
+  tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) %>%
   
   # highlight selected sigma
-  tab_style(
-    style = cell_fill(color = "#E8F1F5"),
-    locations = cells_body(
-      columns = `σ = 200`
-    )
-  ) %>%
-  tab_style(
-    style = cell_fill(color = "#E8F1F5"),
-    locations = cells_column_labels(
-      columns = `σ = 200`
-    )
-  )
+  tab_style(style = cell_fill(color = "#E8F1F5"),
+            locations = cells_body(columns = `σ = 200`)) %>%
+  tab_style(style = cell_fill(color = "#E8F1F5"),
+            locations = cells_column_labels(columns = `σ = 200`))
 ```
 
 The table shows how different values of $\sigma$ affect the probability of a draw as the rating gap between two teams increases. Smaller values cause the draw probability to decrease more rapidly, while larger values maintain a higher draw probability. We selected $\sigma = 200$ as a moderate assumption, allowing the draw probability to decrease progressively without declining too quickly or remaining too high for large Elo differences.
@@ -388,22 +360,15 @@ htmltools::div(
   
   calendar_ko %>%
     gt() %>%
-    tab_header(
-      title = "World Cup Knockout Stage Calendar"
-    ) %>%
-    tab_style(
-      style = cell_text(weight = "bold"),
-      locations = cells_column_labels()
-    ) %>%
+    tab_header(title = "World Cup Knockout Stage Calendar") %>%
+    tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) %>%
     tab_style(
       style = cell_borders(
         sides = c("left", "right"),
         color = "grey80",
         weight = px(1)
       ),
-      locations = cells_body(
-        columns = everything()
-      )
+      locations = cells_body(columns = everything())
     ) %>%
     tab_style(
       style = cell_borders(
@@ -411,9 +376,7 @@ htmltools::div(
         color = "grey70",
         weight = px(1)
       ),
-      locations = cells_column_labels(
-        columns = everything()
-      )
+      locations = cells_column_labels(columns = everything())
     )
 )
 ```
@@ -555,7 +518,6 @@ set.seed(NULL)
 
 # monte carlo function
 run_cup_mc <- function(number_of_simulations) {
-  
   # stages we want probabilities
   stages <- c("R32", "R16", "QF", "SF", "Final", "Champion")
   
@@ -569,39 +531,25 @@ run_cup_mc <- function(number_of_simulations) {
   
   # repeat complete tournament
   for (i in seq_len(number_of_simulations)) {
-    
     # simulate group stage
     qualified_teams <- qualify_r32()
     
     # simulate knockout stage
-    knockout_results <- play_knockout(
-      qualifiers = qualified_teams,
-      calendar = calendar_ko
-    )
+    knockout_results <- play_knockout(qualifiers = qualified_teams, calendar = calendar_ko)
     
     # collect teams that reached each stage in this tournament
     reached <- list(
       R32 = qualified_teams$team,
       
-      R16 = knockout_results$winner[
-        knockout_results$round == "R32"
-      ],
+      R16 = knockout_results$winner[knockout_results$round == "R32"],
       
-      QF = knockout_results$winner[
-        knockout_results$round == "R16"
-      ],
+      QF = knockout_results$winner[knockout_results$round == "R16"],
       
-      SF = knockout_results$winner[
-        knockout_results$round == "Quarter"
-      ],
+      SF = knockout_results$winner[knockout_results$round == "Quarter"],
       
-      Final = knockout_results$winner[
-        knockout_results$round == "Semi"
-      ],
+      Final = knockout_results$winner[knockout_results$round == "Semi"],
       
-      Champion = knockout_results$winner[
-        knockout_results$round == "Final"
-      ]
+      Champion = knockout_results$winner[knockout_results$round == "Final"]
     )
     
     
@@ -626,9 +574,7 @@ run_cup_mc <- function(number_of_simulations) {
   )
   
   # sort before rounding
-  output <- output[
-    order(-output$Champion, -output$Final),
-  ]
+  output <- output[order(-output$Champion, -output$Final), ]
   
   # apply rounding
   output[stages] <- lapply(output[stages], round, digits = 1)
@@ -647,7 +593,6 @@ The first tab, "Tournament predictions", displays the favourites' estimated titl
 ```{r simulator-ui, echo=FALSE}
 # Shiny user interface
 tagList(
-  
   # Styling for the application
   tags$style(
     HTML(
@@ -668,94 +613,68 @@ tagList(
   ),
   
   # Main application container
-  div(
-    class = "wc-app",
-    
-    sidebarLayout(
-      
-      # Simulation settings
-      sidebarPanel(
-        
-        numericInput(
-          "n_simulations",
-          "Number of simulations",
-          value = 1000,
-          min = 100,
-          max = 50000,
-          step = 100
-        ),
-        
-        numericInput(
-          "simulation_seed",
-          "Random seed",
-          value = 123,
-          min = 1,
-          max = 1000000,
-          step = 1
-        ),
-        
-        actionButton(
-          "run_mc",
-          "Run simulations",
-          class = "btn-primary"
-        ),
-        
-        helpText(
-          "The same seed and settings reproduce the same predictions."
-        ),
-        
-        width = 3
+  div(class = "wc-app", sidebarLayout(
+    # Simulation settings
+    sidebarPanel(
+      numericInput(
+        "n_simulations",
+        "Number of simulations",
+        value = 1000,
+        min = 100,
+        max = 50000,
+        step = 100
       ),
       
-      # Simulation results
-      mainPanel(
+      numericInput(
+        "simulation_seed",
+        "Random seed",
+        value = 123,
+        min = 1,
+        max = 1000000,
+        step = 1
+      ),
+      
+      actionButton("run_mc", "Run simulations", class = "btn-primary"),
+      
+      helpText("The same seed and settings reproduce the same predictions."),
+      
+      width = 3
+    ),
+    
+    # Simulation results
+    mainPanel(tabsetPanel(
+      # TAB 1: Tournament predictions
+      tabPanel(
+        "Tournament predictions",
         
-        tabsetPanel(
-          
-          # TAB 1: Tournament predictions
-          tabPanel(
-            "Tournament predictions",
-            
-            br(),
-            
-            textOutput("simulation_status"),
-            
-            plotlyOutput(
-              "favourites_chart",
-              height = "500px"
-            )
-          ),
-          
-          # TAB 2: Explore an individual team
-          tabPanel(
-            "Explore a team",
-            
-            br(),
-            
-            selectInput(
-              "selected_team",
-              "Select a team",
-              choices = sort(unname(teams)),
-              selected = "Switzerland"
-            ),
-            
-            h3(
-              textOutput("team_title")
-            ),
-            
-            textOutput("team_details"),
-            
-            plotlyOutput(
-              "team_chart",
-              height = "400px"
-            )
-          )
+        br(),
+        
+        textOutput("simulation_status"),
+        
+        plotlyOutput("favourites_chart", height = "500px")
+      ),
+      
+      # TAB 2: Explore an individual team
+      tabPanel(
+        "Explore a team",
+        
+        br(),
+        
+        selectInput(
+          "selected_team",
+          "Select a team",
+          choices = sort(unname(teams)),
+          selected = "Switzerland"
         ),
         
-        width = 9
+        h3(textOutput("team_title")),
+        
+        textOutput("team_details"),
+        
+        plotlyOutput("team_chart", height = "400px")
       )
-    )
-  )
+    ), width = 9)
+  ))
 )
 ```
 
@@ -842,18 +761,15 @@ run_mc_shiny <- function(n) {
 # Define the tournament stages
 stage_columns <- c("R32", "R16", "QF", "SF", "Final", "Champion")
 
-stage_labels <- c(
-  "Round of 32",
-  "Round of 16",
-  "Quarter-finals",
-  "Semi-finals",
-  "Final",
-  "Champion"
-)
+stage_labels <- c("Round of 32",
+                  "Round of 16",
+                  "Quarter-finals",
+                  "Semi-finals",
+                  "Final",
+                  "Champion")
 
 # Run Monte Carlo when the button is clicked
 mc_run <- eventReactive(input$run_mc, {
-  
   n <- input$n_simulations
   seed <- input$simulation_seed
   
@@ -872,48 +788,39 @@ mc_run <- eventReactive(input$run_mc, {
   
   set.seed(as.integer(seed))
   
-  list(
-    predictions = run_mc_shiny(as.integer(n)),
-    n = n,
-    seed = seed
-  )
+  list(predictions = run_mc_shiny(as.integer(n)),
+       n = n,
+       seed = seed)
 })
 
 # Display simulation status
 output$simulation_status <- renderText({
-  
   if (input$run_mc == 0) {
     return("Click 'Run simulations' to generate predictions.")
   }
   
   run <- mc_run()
   
-  paste(
-    format(run$n, big.mark = ","),
-    "simulations completed — seed:",
-    run$seed
-  )
+  paste(format(run$n, big.mark = ","),
+        "simulations completed — seed:",
+        run$seed)
 })
 
 
 # TAB 1: display the ten favourites
 output$favourites_chart <- renderPlotly({
-  
   req(input$run_mc > 0)
   
   # Select the ten teams with the highest title probabilities
   top <- head(mc_run()$predictions, 10)
   
   # Order teams for the horizontal bar chart
-  top$team <- factor(
-    top$team,
-    levels = rev(top$team)
-  )
+  top$team <- factor(top$team, levels = rev(top$team))
   
   plot_ly(
     top,
-    x = ~Champion,
-    y = ~team,
+    x = ~ Champion,
+    y = ~ team,
     type = "bar",
     orientation = "h",
     marker = list(color = "#2463A0"),
@@ -929,73 +836,46 @@ output$favourites_chart <- renderPlotly({
         rangemode = "tozero"
       ),
       
-      yaxis = list(
-        title = "",
-        automargin = TRUE
-      )
+      yaxis = list(title = "", automargin = TRUE)
     )
 })
 
 
 # TAB 2: display the selected team's name
 output$team_title <- renderText({
-  
   input$selected_team
 })
 
 
 # Display the selected team's group and Elo rating
 output$team_details <- renderText({
-  
   req(input$selected_team)
   
-  team_id <- names(teams)[
-    match(input$selected_team, unname(teams))
-  ]
+  team_id <- names(teams)[match(input$selected_team, unname(teams))]
   
-  paste0(
-    "Group: ",
-    substr(team_id, 1, 1),
-    " | Elo: ",
-    unname(rating[input$selected_team])
-  )
+  paste0("Group: ", substr(team_id, 1, 1), " | Elo: ", unname(rating[input$selected_team]))
 })
 
 
 # Display the selected team's probability of reaching each stage
 output$team_chart <- renderPlotly({
-  
   req(input$run_mc > 0)
   
   predictions <- mc_run()$predictions
   
   # Select the results for the chosen team
-  selected <- predictions[
-    predictions$team == input$selected_team,
-    ,
-    drop = FALSE
-  ]
+  selected <- predictions[predictions$team == input$selected_team, , drop = FALSE]
   
   # Extract its probabilities for each tournament stage
-  probabilities <- as.numeric(
-    unlist(
-      selected[stage_columns],
-      use.names = FALSE
-    )
-  )
+  probabilities <- as.numeric(unlist(selected[stage_columns], use.names = FALSE))
   
-  chart_data <- data.frame(
-    stage = factor(
-      stage_labels,
-      levels = stage_labels
-    ),
-    probability = probabilities
-  )
+  chart_data <- data.frame(stage = factor(stage_labels, levels = stage_labels),
+                           probability = probabilities)
   
   plot_ly(
     chart_data,
-    x = ~stage,
-    y = ~probability,
+    x = ~ stage,
+    y = ~ probability,
     type = "bar",
     marker = list(color = "#008577"),
     hovertemplate =
@@ -1004,10 +884,7 @@ output$team_chart <- renderPlotly({
     layout(
       title = "Probability of reaching each stage",
       
-      xaxis = list(
-        title = "",
-        automargin = TRUE
-      ),
+      xaxis = list(title = "", automargin = TRUE),
       
       yaxis = list(
         title = "Probability",
@@ -1023,17 +900,17 @@ output$team_chart <- renderPlotly({
 We simulated the World Cup 1000 times to explore three main questions : which teams are the favourites to win the title, how far each team is expected to progress and which group-stage outcomes were the most surprising compared with the model's predictions.
 
 ```{r run_mc, cache=TRUE}
-#fix the seed
+# fix the seed
 set.seed(123)
 
 # run simulation
 mc_results <- run_cup_mc(1000)
 ```
 
-### Who are the favourite ?
+### Who are the favorites ?
 
 ```{r favourite, fig.align='center'}
-# select top 10 
+# select top 10
 top_10 <- mc_results %>%
   arrange(desc(Champion), desc(Final)) %>%
   slice_head(n = 10) %>%
@@ -1052,13 +929,11 @@ champion_plot <- plot_ly(
          xaxis = list(title = "Probability of winning", ticksuffix = "%"))
 
 # show
-htmltools::div(
-  style = "display: flex; justify-content: center;",
-  champion_plot
-)
+htmltools::div(style = "display: flex; justify-content: center;", champion_plot)
 ```
 
 ```{r values_champions, include=FALSE}
+# extract values from results
 first_team <- as.character(top_10$team[1])
 first_prob <- top_10$Champion[1]
 
@@ -1070,6 +945,7 @@ top_three_prob <- sum(top_10$Champion[1:3])
 last_team <- as.character(top_10$team[10])
 last_prob <- top_10$Champion[10]
 
+# compute probability ratio
 prob_ratio <- first_prob / last_prob
 ```
 
@@ -1125,7 +1001,8 @@ heatmap_plot <- plot_ly(
   ),
   colorbar = list(title = "Probability", ticksuffix = "%"),
   width = 870,
-height = 1100) %>%
+  height = 1100
+) %>%
   layout(
     title = "How far could each team go?",
     xaxis = list(title = "", side = "top"),
@@ -1167,26 +1044,16 @@ actual_results <- read.csv2(
 actual_results_table <- actual_results %>%
   gt() %>%
   
-  tab_header(
-    title = "Actual Tournament Results"
-  ) %>%
-  cols_label(
-    team = "Team",
-    actual_stage = "Stage reached"
-  ) %>%
-  tab_style(
-    style = cell_text(weight = "bold"),
-    locations = cells_column_labels()
-  ) %>%
+  tab_header(title = "Actual Tournament Results") %>%
+  cols_label(team = "Team", actual_stage = "Stage reached") %>%
+  tab_style(style = cell_text(weight = "bold"), locations = cells_column_labels()) %>%
   tab_style(
     style = cell_borders(
       sides = c("left", "right"),
       color = "grey80",
       weight = px(1)
     ),
-    locations = cells_body(
-      columns = everything()
-    )
+    locations = cells_body(columns = everything())
   ) %>%
   tab_style(
     style = cell_borders(
@@ -1194,15 +1061,10 @@ actual_results_table <- actual_results %>%
       color = "grey70",
       weight = px(1)
     ),
-    locations = cells_column_labels(
-      columns = everything()
-    )
+    locations = cells_column_labels(columns = everything())
   )
 
-htmltools::div(
-  style = "max-height: 500px; overflow-y: auto;",
-  actual_results_table
-)
+htmltools::div(style = "max-height: 500px; overflow-y: auto;", actual_results_table)
 ```
 
 The qualification probability is the proportion of Monte Carlo simulations in which a team reached the round of 32. We compare this probability with what actually happened : if a team actually qualified we use the qualification probability. If it was eliminated, we use $1 - p$, where $p$ is the qualification probability. A lower probability for the actual outcome indicates a more surprising result according to the simulations.
@@ -1217,11 +1079,7 @@ group_surprises <- mc_results %>%
     outcome = if_else(qualified, "Qualified", "Eliminated"),
     
     # observed probability
-    observed_probability = if_else(
-      qualified,
-      R32,
-      100 - R32
-    )
+    observed_probability = if_else(qualified, R32, 100 - R32)
   ) %>%
   arrange(R32, team) %>%
   mutate(position = row_number())
@@ -1232,9 +1090,9 @@ plot_height <- nrow(group_surprises) * 25
 
 surprises_plot <- plot_ly(
   data = group_surprises,
-  x = ~R32,
-  y = ~position,
-  color = ~outcome,
+  x = ~ R32,
+  y = ~ position,
+  color = ~ outcome,
   colors = c(
     "Qualified" = "#008577",
     "Eliminated" = "#C45A35"
@@ -1242,7 +1100,7 @@ surprises_plot <- plot_ly(
   type = "scatter",
   mode = "markers",
   marker = list(size = 10),
-  text = ~team,
+  text = ~ team,
   height = plot_height,
   width = 850,
   hovertemplate = paste0(
@@ -1268,9 +1126,7 @@ surprises_plot <- plot_ly(
       ticktext = group_surprises$team
     ),
     
-    legend = list(
-      title = list(text = "Actual outcome")
-    )
+    legend = list(title = list(text = "Actual outcome"))
   )
 
 # show
@@ -1307,17 +1163,11 @@ top_surprises %>%
     observed_probability = "Observed outcome probability"
   ) %>%
   fmt_number(
-    columns = c(
-      qualification_probability,
-      observed_probability
-    ),
+    columns = c(qualification_probability, observed_probability),
     decimals = 1,
     suffixing = FALSE
   ) %>%
-  cols_align(
-    align = "center",
-    columns = everything()
-  )
+  cols_align(align = "center", columns = everything())
 ```
 
 The top ten surprises are selected as the outcomes with the lowest observed-outcome probabilities according to the model.
