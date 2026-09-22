@@ -117,7 +117,7 @@ d.predict2026 |>
   select(country, rating_gap, win_rate)
 ```
 
-The resulting dataset contains the original team-level predictors together with the newly created "rating_gap" and "win_rate" variables. "is_host" and "confederation" have also been converted to factors for use in the statistical models.
+The resulting dataset contains the original team-level predictors together with the newly created `rating_gap` and `win_rate` variables. `is_host` and `confederation` have also been converted to factors for use in the statistical models.
 
 ## Select predictors
 
@@ -133,9 +133,9 @@ d.predict2026 |>
   cor(use = "complete.obs")
 ```
 
-The correlation matrix shows a very strong negative correlation between "rating" and "rank" (r = -0.971). This indicates substantial redundancy between the two predictors and raises a clear concern about multicollinearity. Therefore, "rank" was excluded, while "rating" was retained in the model.
+The correlation matrix shows a very strong negative correlation between `rating` and `rank` (r = -0.971). This indicates substantial redundancy between the two predictors and raises a clear concern about multicollinearity. Therefore, `rank` was excluded, while `rating` was retained in the model.
 
-The correlations among the remaining predictors are considerably weaker. Therefore, "rating_gap" and "win_rate" were retained as additional predictors.
+The correlations among the remaining predictors are considerably weaker. Therefore, `rating_gap` and `win_rate` were retained as additional predictors.
 
 ## Fit the GLM Model
 
@@ -184,7 +184,7 @@ The odds ratios provide an interpretation of the estimated effects of the predic
 
 - Rating gap: OR = 1.00. The estimated effect is very small, and the association is not statistically significant (p = 0.775). Therefore, the rating gap does not provide clear evidence of an additional association with reaching the Round of 16 in this model.
 
-- Win rate: OR = 0.121. The model estimates lower estimated odds of reaching the Round of 16 at higher values of win rate. However, this association is not statistically significant (p = 0.708), so the estimated negative direction should not be interpreted as evidence of a meaningful relationship.\
+- Win rate: OR = 0.121. The model estimates lower odds of reaching the Round of 16 at higher values of win rate. However, this association is not statistically significant (p = 0.708), so the estimated negative direction should not be interpreted as evidence of a meaningful relationship.\
 
 ## Generate final GLM probabilities for the 48 teams
 

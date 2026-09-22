@@ -126,7 +126,7 @@ The predictive analysis confirmed the importance of Elo rating, which was the on
 
 The simulation reinforced this uncertainty. Although stronger teams generally had higher probabilities of progressing, team strength alone did not determine tournament outcomes. Group composition and tournament pathways also influenced advancement probabilities, and comparison with actual results revealed several outcomes that were relatively unlikely according to the simulations.
 
-However, out approach has several limitations. A football match depends on more than the difference between two Elo ratings. Player form, injuries, red cards, weather, travel and fatigue can all influence performance but are not captured by our models. In addition, modeling choices may influence results.
+However, our approach has several limitations. A football match depends on more than the difference between two Elo ratings. Player form, injuries, red cards, weather, travel and fatigue can all influence performance but are not captured by our models. In addition, modeling choices may influence results.
 
 Overall, the different analyses point to the same central conclusion : Elo rating provides a useful measure of football strength and a strong basis for understanding historical trajectories and estimating future performance, but football remains inherently uncertain.
 
@@ -142,4 +142,4 @@ World Football Elo Ratings. (n.d.). *About the ratings*. <https://eloratings.net
 
 # Usage of Generative AI
 
-We declare that generative AI tools were used as a supporting tool during this project to assist with troubleshooting and resolving coding issues, and correcting grammar and language. All analytical decisions, interpretation of results and conclusions were developed by the authors. No generative AI was used for the analysis or interpretation of the findings. fi
+We declare that generative AI tools were used as a supporting tool during this project to assist with troubleshooting and resolving coding issues, and correcting grammar and language. All analytical decisions, interpretation of results and conclusions were developed by the authors. No generative AI was used for the analysis or interpretation of the findings.

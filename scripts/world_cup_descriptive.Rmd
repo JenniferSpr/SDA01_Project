@@ -378,7 +378,7 @@ shinyApp(ui, server, options = list(width = "100%", height = "1000px"))
 
 ## Is There a Home Advantage?
 
-This analysis examines whether teams that play a larger share of their matches on home are associating with higher win rates. For each country, the share of matches played at home is plotted against overall win rate, with points colored by current Elo rating and with a linear fit to summarize the relationship.
+This analysis examines whether teams that play a larger share of their matches at home are associated with higher win rates. For each country, the share of matches played at home is plotted against overall win rate, with points colored by current Elo rating and with a linear fit to summarize the relationship.
 
 Across all 48 teams, the correlation between the share of matches played at home and overall win rate is weak (r = 0.14). While the regression line has a positive slope, the relationship explains very little of the variance in win rate, suggesting that home-field advantage is not a strong driver of overall win rate once other factors are left uncontrolled.
 
@@ -660,7 +660,7 @@ This section evaluates the Elo rating trajectory between `debutants`, `returners
 
 The teams are grouped as follows:
 
-- **Debutants** (first qualified in 2026): Cape Verde, Curacao, Jordan, and Uzbekistan
+- **Debutants** (first qualified in 2026): Cape Verde, Curaçao, Jordan, and Uzbekistan
 - **Returners** (second-ever appearance, after a long gap since their first): Haiti, DR Congo, Iraq, Panama, Bosnia and Herzegovina
 - **Traditional power** (10+ total qualifications, at least 2 consecutive recent appearances): Brazil, Germany, Argentina, Mexico, England, France, Spain, Uruguay, Belgium, Switzerland, Netherlands, South Korea, United States
 - **Occasional qualifier**: all remaining teams not meeting the criteria above

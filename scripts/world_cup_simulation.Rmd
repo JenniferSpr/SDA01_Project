@@ -128,9 +128,9 @@ groups_table
 
 ## Match Model
 
-In the group stage, each team has to plays the three other teams in its group. The possible outcomes of a match are a win, a draw or a loss, and teams are ranked according to the points they earn.
+In the group stage, each team has to play the three other teams in its group. The possible outcomes of a match are a win, a draw or a loss, and teams are ranked according to the points they earn.
 
-To model match outcomes, we first calculate the difference between the two team's Elo ratings :
+To model match outcomes, we first calculate the difference between the two teams' Elo ratings :
 
 $$d = R_A - R_B$$
 
@@ -220,7 +220,7 @@ expand.grid(
   )
 ```
 
-The table shows how different values of $\sigma$ affect the probability of a draw as the rating gap between two team increases. Smaller values cause the draw probability to decrease more rapidly, while larger values maintain a higher draw probability. We selected $\sigma = 200$ as a moderate assumption, allowing the draw probability to decrease progressively without declining too quickly or remaining too high for large Elo differences.
+The table shows how different values of $\sigma$ affect the probability of a draw as the rating gap between two teams increases. Smaller values cause the draw probability to decrease more rapidly, while larger values maintain a higher draw probability. We selected $\sigma = 200$ as a moderate assumption, allowing the draw probability to decrease progressively without declining too quickly or remaining too high for large Elo differences.
 
 Once the draw probability has been determined, we distribute the remaining probability between the two teams using the Elo value :
 
@@ -547,7 +547,7 @@ play_knockout <- function(qualifiers, calendar = calendar_ko) {
 
 ## Simulation
 
-Finally, we run the Monte Carlo simulation, repeating the tournament many times to estimate each team's probability of reaching each stage and winning the title. For each simulation, we record which teams reach each stage and which teams wins the tournament. After all simulations, we estimate each probability by dividing the number of times a team reaches that stage by the total number of simulations.
+Finally, we run the Monte Carlo simulation, repeating the tournament many times to estimate each team's probability of reaching each stage and winning the title. For each simulation, we record which teams reach each stage and which teams win the tournament. After all simulations, we estimate each probability by dividing the number of times a team reaches that stage by the total number of simulations.
 
 ```{r monte_carlo_function}
 # seed not fixed to allow multiple simulations
@@ -642,7 +642,7 @@ run_cup_mc <- function(number_of_simulations) {
 
 The following interactive application allows users to choose the number of simulations and a random seed. Using the same seed and settings reproduces the predictions, while changing the seed generates a different simulation run.
 
-The first tab, "Tournament predictions", displays the favourites' estimated title probabilities. The second tab, "Explore a team", lets users to select a team and view its probability of reaching each stage.
+The first tab, "Tournament predictions", displays the favourites' estimated title probabilities. The second tab, "Explore a team", lets users select a team and view its probability of reaching each stage.
 
 ```{r simulator-ui, echo=FALSE}
 # Shiny user interface
@@ -1079,7 +1079,7 @@ Across the 1000 simulations, `r first_team` has the highest estimated probabilit
 
 ### How far are teams expected to go ?
 
-Although `r first_team`, `r second_team` and `r third_team` account for most of the estimated title probability, it can also be useful to examine how far each team is likely to progress in the tournament according to team's strength.
+Although `r first_team`, `r second_team` and `r third_team` account for most of the estimated title probability, it can also be useful to examine how far each team is likely to progress in the tournament according to the team's strength.
 
 ```{r stage_heatmap, fig.width=10, fig.height=15, fig.align='center'}
 # order of the stages
@@ -1328,4 +1328,4 @@ The most surprising group-stage outcome is Uruguay's elimination, as the team ha
 
 We reconstructed the 2026 World Cup using the official group composition and knockout schedule, with match outcomes simulated using Elo ratings and a separate model for draws. By repeating the tournament 1000 times, we estimated each team's probability of reaching each stage and winning the title.
 
-The heatmap showed that team strength alone does not determine tournament outcomes. Some lower-rated teams had higher qualifications probabilities than stronger teams. In addition, comparing simulated qualification probabilities with actual outcomes also revealed several unexpected results. Some teams were eliminated despite having a high probability of qualifying, while others qualified despite having a relatively low probability of doing so.
+The heatmap showed that team strength alone does not determine tournament outcomes. Some lower-rated teams had higher qualification probabilities than stronger teams. In addition, comparing simulated qualification probabilities with actual outcomes also revealed several unexpected results. Some teams were eliminated despite having a high probability of qualifying, while others qualified despite having a relatively low probability of doing so.

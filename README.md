@@ -101,14 +101,14 @@ This project requires the following R packages:
 
 - **Dates and project management:** `lubridate`, `here`
 
-- **Reporting and application:** `knitr`, `rmarkdown`, `shiny`
+- **Reporting and application:** `knitr`, `rmarkdown`, `shiny`, `htmltools`
 
 All required packages can be installed by running the following command in R:
 
 ```         
 install.packages(c(
   "broom", "dplyr", "DT", "dtw", "dtwclust", "forcats",
-  "ggplot2", "ggrepel", "gt", "here", "knitr", "lubridate",
+  "ggplot2", "ggrepel", "gt", "here", "htmltools", "knitr", "lubridate",
   "paletteer", "patchwork", "plotly", "proxy", "purrr",
   "ranger", "rmarkdown", "rsample", "scales", "shiny",
   "tidyr", "tidyverse", "yardstick"
