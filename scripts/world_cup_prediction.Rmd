@@ -9,7 +9,7 @@ Building on the previous analyses, this section moves from describing and groupi
 
 ## Prepare prediction dataset
 
-```{r}
+```{r message = FALSE}
 # Load required packages
 library(tidyverse)
 library(here)

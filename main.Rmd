@@ -1,6 +1,5 @@
 ---
 runtime: shiny
-
 output:
   html_document:
     css: styles.css
@@ -9,9 +8,23 @@ output:
     toc_float: true
     number_sections: true
     code_folding: hide
+resource_files:
+- scripts/cleaning.R
+- data/wc2026_qualifier_history.csv
+- data/actual_stage.csv
+- data/third_place_assignments_495.csv
+- data/calendar_ko.csv
+- data/elo_ratings.csv
+- data/wc_elo_ratings.csv
+- data/elo_ratings_wc2026.csv
 ---
 
 ![](images/Banner.png "title-banner")
+
+```{r global-setup, include = FALSE}
+library(here)
+here::i_am("main.Rmd")
+```
 
 # Introduction
 
