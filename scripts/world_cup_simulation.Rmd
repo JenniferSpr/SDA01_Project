@@ -1154,7 +1154,7 @@ top_surprises %>%
 
 The top ten surprises are selected as the outcomes with the lowest observed-outcome probabilities according to the model.
 
-The most surprising group-stage outcome is Uruguay's elimination, as the team had a high qualification probability but was actually eliminated. On the other hand, Ghana had a low qualification probability but still qualified.
+The most surprising group-stage outcome is Uruguay's elimination, as the team had a high qualification probability but was actually eliminated. On the other hand, Ghana had a low qualification probability but still qualified. This shows, once again, that even outcomes considered unlikely by the simulation can occur, and therefore reinforces the previous observation that team strength does not fully determine tournament progression.
 
 ## Conclusion
 

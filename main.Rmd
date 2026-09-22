@@ -19,7 +19,7 @@ Football's global balance of power is constantly shifting: new generations emerg
 
 This project uses over a century of historical Elo ratings for national football teams to explore how global football power has shifted across countries, confederations, and time, using the 2026 FIFA World Cup as a focal point. Rather than treating the tournament as an isolated event, we situate it within each team's long run trajectory, asking whether traditional powers still dominate, whether confederation strength is converging, and how debutant or returning nations compare to established qualifiers. Building on this historical analysis, we also develop predictive models to examine team performance and simulate the 2026 FIFA World Cup to explore potential tournament outcomes.
 
-These insights are particularly relevant to football analysts and researchers, sports data scientists and data-driven sports journalists. The combination of historical analysis, statistical modeling and tournament simulation provides a quantitative framework for examining long-term shifts in competitive strength and assessing team performance in the context of the 2026 FIFA World Cup.
+These insights are particularly relevant to football analysts and researchers, sports data scientists, and data-driven sports journalists. The combination of historical analysis, statistical modeling and tournament simulation provides a quantitative framework for examining long-term shifts in competitive strength and assessing team performance in the context of the 2026 FIFA World Cup.
 
 # Data Source
 
