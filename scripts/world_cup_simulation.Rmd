@@ -353,7 +353,7 @@ calendar_ko <- read.csv(
 )
 ```
 
-```{r show_calendar}
+```{r show_calendar, include = FALSE}
 # show calendar
 htmltools::div(
   style = "max-height: 500px; overflow-y: auto;",
@@ -599,7 +599,7 @@ tagList(
       "
       .wc-app {
         width: 100%;
-        height: 700px;
+        height: 650px;
         overflow-y: auto;
         overflow-x: hidden;
         padding: 15px;
@@ -1000,7 +1000,6 @@ heatmap_plot <- plot_ly(
     "<extra></extra>"
   ),
   colorbar = list(title = "Probability", ticksuffix = "%"),
-  width = 870,
   height = 1100
 ) %>%
   layout(
@@ -1010,15 +1009,7 @@ heatmap_plot <- plot_ly(
   )
 
 # show
-htmltools::div(
-  style = "
-    max-height: 600px;
-    overflow-y: auto;
-    display: flex;
-    justify-content: center;
-  ",
-  heatmap_plot
-)
+htmltools::div(style = "display: flex; justify-content: center;", heatmap_plot)
 ```
 
 The heatmap displays each team's probability of reaching each stage, with teams ordered by Elo rating from highest to lowest. It shows that a higher ranking does not always correspond to a higher probability of advancing. Indeed, as seen for the Round of 32, advancement probabilities would be expected to generally decrease as Elo ratings decline. However, this pattern is not strictly observed, which suggests that tournament progression is influenced not only by team strength.
@@ -1102,7 +1093,6 @@ surprises_plot <- plot_ly(
   marker = list(size = 10),
   text = ~ team,
   height = plot_height,
-  width = 850,
   hovertemplate = paste0(
     "<b>%{text}</b><br>",
     "Probability: %{x:.1f}%",
@@ -1130,15 +1120,7 @@ surprises_plot <- plot_ly(
   )
 
 # show
-htmltools::div(
-  style = "
-    max-height: 650px;
-    overflow-y: auto;
-    display: flex;
-    justify-content: center;
-  ",
-  surprises_plot
-)
+htmltools::div(style = "display: flex; justify-content: center;", surprises_plot)
 ```
 
 The teams are ordered by their predicted probability of reaching the round of 32. The most unexpected outcomes are qualifications, shown in green, at the low-probability end, and eliminations, shown in orange, at the high-probability end. The ten most surprising outcomes are listed below :
